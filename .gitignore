@@ -1,0 +1,54 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Testing
+/coverage
+
+# Next.js build output
+/.next/
+/out/
+
+# Production
+/build
+/dist
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment files
+.env*.local
+.env
+.env.production
+.env.development
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Editor directories
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Internal docs & plans
+APPLE_*.md
+COMMUNITY_*.md
+*_PLAN.md
+*_ENGINE.md
+*_ANIMATIONS.md
+*_FEEDBACK.md
+

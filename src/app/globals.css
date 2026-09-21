@@ -1,0 +1,355 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --surface: #f4f4f5;
+  --surface-hover: #e4e4e7;
+  --surface-active: #d4d4d8;
+  --border: #e4e4e7;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #18181b;
+  --accent-foreground: #fafafa;
+
+  /* ─────────────────────────────────────────────────────────
+     APPLE-INSPIRED MOTION TOKENS (SPRING PRESETS & CURVES)
+     ───────────────────────────────────────────────────────── */
+  --spring-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  --spring-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-smooth: cubic-bezier(0.25, 1, 0.5, 1);
+  --spring-interactive: cubic-bezier(0.1, 0.9, 0.2, 1);
+
+  --ease-apple-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-apple-decelerate: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-apple-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-apple-accelerate: cubic-bezier(0.4, 0, 1, 1);
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --surface: #18181b;
+  --surface-hover: #27272a;
+  --surface-active: #3f3f46;
+  --border: #27272a;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --accent: #fafafa;
+  --accent-foreground: #09090b;
+}
+
+html,
+body {
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom minimal scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(160, 160, 160, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(160, 160, 160, 0.4);
+}
+
+/* Hide scrollbar for Chrome, Safari, Opera, Edge, Firefox while keeping scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+
+/* ─────────────────────────────────────────────────────────
+   APPLE-INSPIRED MOTION & ANIMATION SYSTEM (SMOOTH DAMPING)
+   ───────────────────────────────────────────────────────── */
+
+/* 1. Modal Entrance & Exit: Gracefully emerges with smooth deceleration */
+@keyframes appleModalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes appleModalExit {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98) translateY(4px);
+  }
+}
+
+/* 2. Menu / Context Menu Entrance */
+@keyframes appleMenuEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes appleMenuExit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* 3. Sheet Entrance (Side & Bottom): Silky smooth edge glide */
+@keyframes appleSheetEnter {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes appleSheetBottomEnter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 4. Tab / Content Crossfade */
+@keyframes appleTabSlide {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 5. Micro Badge Pop / Smooth Settling */
+@keyframes appleBadgePop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.025);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 6. Subtle Pulse / Shimmer */
+@keyframes appleShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Animation Utility Classes (Smooth Easing & Generous Durations) */
+.animate-apple-modal {
+  animation: appleModalEnter 0.36s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-apple-modal-exit {
+  animation: appleModalExit 0.22s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-apple-menu {
+  animation: appleMenuEnter 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-apple-menu-exit {
+  animation: appleMenuExit 0.16s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-apple-sheet {
+  animation: appleSheetEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-apple-sheet-bottom {
+  animation: appleSheetBottomEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-fade-in {
+  animation: appleTabSlide 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-badge-pop {
+  animation: appleBadgePop 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Stagger Animation Delays */
+.stagger-1 { animation-delay: 30ms; }
+.stagger-2 { animation-delay: 60ms; }
+.stagger-3 { animation-delay: 90ms; }
+.stagger-4 { animation-delay: 120ms; }
+
+/* ─────────────────────────────────────────────────────────
+   FROSTED GLASS ACRYLIC MATERIALS (AUTHENTIC OPTICAL BLUR)
+   ───────────────────────────────────────────────────────── */
+.apple-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(28px) saturate(190%) contrast(102%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.8), 0 4px 20px -4px rgba(0, 0, 0, 0.03);
+}
+.dark .apple-glass {
+  background: rgba(13, 14, 18, 0.72);
+  backdrop-filter: blur(28px) saturate(190%) contrast(102%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 4px 24px -4px rgba(0, 0, 0, 0.4);
+}
+
+.apple-glass-card {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(24px) saturate(180%) contrast(102%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%) contrast(102%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.7), 0 8px 32px -4px rgba(0, 0, 0, 0.05), 0 2px 8px -2px rgba(0, 0, 0, 0.02);
+}
+.dark .apple-glass-card {
+  background: rgba(18, 20, 26, 0.60);
+  backdrop-filter: blur(24px) saturate(180%) contrast(102%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%) contrast(102%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 8px 36px -6px rgba(0, 0, 0, 0.5), 0 2px 10px -2px rgba(0, 0, 0, 0.3);
+}
+
+.apple-glass-modal {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(36px) saturate(200%) contrast(104%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%) contrast(104%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.9), 0 24px 64px -12px rgba(0, 0, 0, 0.2);
+}
+.dark .apple-glass-modal {
+  background: rgba(15, 17, 23, 0.78);
+  backdrop-filter: blur(36px) saturate(200%) contrast(104%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%) contrast(104%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.05), 0 28px 72px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* ─────────────────────────────────────────────────────────
+   SILKY SMOOTH SPRING INTERACTIONS & DAMPING
+   ───────────────────────────────────────────────────────── */
+.apple-press {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease, background-color 0.2s ease;
+  will-change: transform;
+}
+.apple-press:active {
+  transform: scale(0.975);
+  transition-duration: 0.09s;
+}
+
+.apple-interactive {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.22s ease, background-color 0.22s ease;
+  will-change: transform, box-shadow;
+}
+.apple-interactive:hover {
+  transform: translateY(-1.5px);
+}
+.apple-interactive:active {
+  transform: scale(0.98) translateY(0);
+  transition-duration: 0.09s;
+}
+
+.apple-card-press {
+  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+.apple-card-press:active {
+  transform: scale(0.99);
+  transition-duration: 0.09s;
+}
+
+/* Blur & Material Presets */
+.apple-blur-subtle {
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+}
+
+.apple-blur-regular {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+.apple-blur-heavy {
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+}
+
+/* ─────────────────────────────────────────────────────────
+   REDUCED MOTION ACCESSIBILITY (STRICT RULE)
+   ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
