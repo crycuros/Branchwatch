@@ -22,18 +22,9 @@ Git is fundamentally a directed acyclic graph (DAG), but developers are forced t
 
 Every node on the canvas accepts and produces semantic Git artifacts. Connections are validated in real-time based on port data types:
 
-```text
-[ Working Tree ]
-       │  (WorkingTreeChanges)
-       ▼
-   [ Stage ]
-       │  (StagedChanges)
-       ▼
-   [ Commit ]
-       │  (CommitRef)
-       ├───► [ Branch ] ───► [ Push ] (RemoteRef)
-       └───► [ Push ] (RemoteRef)
-```
+<p align="center">
+  <img src="workflow-pipeline.svg" alt="BranchWatch Node Pipeline Architecture" width="100%" />
+</p>
 
 | Node Type | Accepts (Input) | Emits (Output) | Description |
 |:---|:---|:---|:---|
