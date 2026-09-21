@@ -126,7 +126,7 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
       {!searchQuery && selectedCategory === 'all' && featuredWorkflows.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <Sparkles className="w-3.5 h-3.5 text-neutral-400" />
             <span>Featured Workflow Recipes</span>
           </div>
 

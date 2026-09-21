@@ -75,8 +75,8 @@ export const WorkflowCard: React.FC<WorkflowCardProps> = ({
               </span>
             </div>
             {workflow.isFeatured && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                <Sparkles className="w-2.5 h-2.5" /> Featured
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-neutral-800 dark:text-neutral-200 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full border border-neutral-200/80 dark:border-neutral-700/80">
+                <Sparkles className="w-2.5 h-2.5 text-neutral-400" /> Featured
               </span>
             )}
           </div>
@@ -86,7 +86,7 @@ export const WorkflowCard: React.FC<WorkflowCardProps> = ({
             onClick={() => onStarToggle(workflow.id)}
             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-mono transition-colors ${
               isStarred
-                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border border-neutral-900 dark:border-white font-semibold shadow-xs'
                 : 'bg-neutral-100 dark:bg-neutral-800/80 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border border-neutral-200/60 dark:border-neutral-700/60'
             }`}
             title={isStarred ? 'Unstar workflow' : 'Star workflow'}
