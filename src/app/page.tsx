@@ -25,6 +25,10 @@ import { ActivityFeed } from '@/components/ActivityFeed';
 import { SearchModal } from '@/components/SearchModal';
 import { VisualWorkflow } from '@/components/visual/VisualWorkflow';
 import { GitGraphView } from '@/components/v3/GitGraphView';
+import { CommunityHub } from '@/components/community/CommunityHub';
+import { WorkflowDiscussions } from '@/components/community/WorkflowDiscussions';
+import { CommunityWorkflow } from '@/lib/communityTypes';
+import { incrementForkCount } from '@/lib/communityStorage';
 import { ShieldCheck, Github } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -42,6 +46,10 @@ export default function Home() {
   const [commits, setCommits] = useState<Commit[]>([]);
   const [selectedCommit, setSelectedCommit] = useState<Commit | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+
+  // Community & Workflow State
+  const [selectedCommunityWorkflow, setSelectedCommunityWorkflow] = useState<CommunityWorkflow | null>(null);
+  const [selectedDiscussionsWorkflow, setSelectedDiscussionsWorkflow] = useState<CommunityWorkflow | null>(null);
 
   // Navigation & UI States
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
@@ -305,6 +313,27 @@ export default function Home() {
     }
   };
 
+  const handleOpenCommunityWorkflow = (wf: CommunityWorkflow) => {
+    setSelectedCommunityWorkflow(wf);
+    setActiveTab('visual');
+  };
+
+  const handleForkCommunityWorkflow = (wf: CommunityWorkflow) => {
+    incrementForkCount(wf.id);
+    const forked: CommunityWorkflow = {
+      ...wf,
+      id: `wf-fork-${Date.now()}`,
+      title: `${wf.title} (Fork)`,
+      forkedFrom: {
+        workflowId: wf.id,
+        title: wf.title,
+        author: wf.author,
+      },
+    };
+    setSelectedCommunityWorkflow(forked);
+    setActiveTab('visual');
+  };
+
   if (isLandingPage) {
     return (
       <LandingPage
@@ -399,9 +428,24 @@ export default function Home() {
               branches={branches}
               commits={commits}
               repoFullName={currentRepo?.full_name}
+              initialWorkflow={selectedCommunityWorkflow}
+              authUser={authUser}
               onExecuteCommit={handleExecuteCommit}
               onExecuteStage={handleExecuteStage}
               onExecuteSwitchBranch={handleExecuteSwitchBranch}
+              onOpenCommunity={() => setActiveTab('community')}
+            />
+          </div>
+        )}
+
+        {/* TAB 4: COMMUNITY WORKFLOW HUB */}
+        {activeTab === 'community' && (
+          <div className="animate-fade-in w-full">
+            <CommunityHub
+              onOpenWorkflowInCanvas={handleOpenCommunityWorkflow}
+              onForkWorkflowToCanvas={handleForkCommunityWorkflow}
+              onOpenPublishModal={() => setActiveTab('visual')}
+              onOpenDiscussions={(wf) => setSelectedDiscussionsWorkflow(wf)}
             />
           </div>
         )}
@@ -440,6 +484,12 @@ export default function Home() {
           </div>
         )}
       </AppShell>
+
+      <WorkflowDiscussions
+        workflow={selectedDiscussionsWorkflow}
+        onClose={() => setSelectedDiscussionsWorkflow(null)}
+        authUser={authUser}
+      />
 
       <SearchModal
         isOpen={isSearchOpen}

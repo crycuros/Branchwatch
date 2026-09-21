@@ -1,8 +1,8 @@
 import React from 'react';
-import { LayoutGrid, FolderGit2, Activity, GitCompare, Workflow, GitMerge, Github } from 'lucide-react';
+import { LayoutGrid, FolderGit2, Activity, GitCompare, Workflow, GitMerge, Github, Compass } from 'lucide-react';
 import { Repository, GitHubUser } from '@/lib/types';
 
-export type NavTab = 'overview' | 'graph' | 'visual' | 'repositories' | 'activity' | 'compare';
+export type NavTab = 'overview' | 'graph' | 'visual' | 'community' | 'repositories' | 'activity' | 'compare';
 
 interface AppShellProps {
   activeTab: NavTab;
@@ -27,6 +27,7 @@ export const AppShell: React.FC<AppShellProps> = ({
     { id: 'overview' as NavTab, label: 'Overview', icon: LayoutGrid },
     { id: 'graph' as NavTab, label: 'Git Graph', icon: GitMerge },
     { id: 'visual' as NavTab, label: 'Visual Workflow', icon: Workflow },
+    { id: 'community' as NavTab, label: 'Community', icon: Compass },
     { id: 'repositories' as NavTab, label: 'Repositories', icon: FolderGit2 },
     { id: 'activity' as NavTab, label: 'Activity', icon: Activity },
     { id: 'compare' as NavTab, label: 'Compare', icon: GitCompare },

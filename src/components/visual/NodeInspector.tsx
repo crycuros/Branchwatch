@@ -212,6 +212,21 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
         )}
       </div>
 
+      {/* Educational Tip / Best Practice Box */}
+      <div className="p-3 rounded-xl bg-neutral-50/80 dark:bg-neutral-800/30 border border-neutral-200/50 dark:border-neutral-700/50 space-y-1">
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+          <span>Best Practice</span>
+        </div>
+        <p className="text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+          {selectedNode.type === 'working_tree' && 'Inspect uncommitted files with git status before staging to avoid tracking .env or secrets.'}
+          {selectedNode.type === 'stage' && 'Stage only files related to a single unit of work. Keep commits atomic and bisect-friendly.'}
+          {selectedNode.type === 'commit' && 'Follow conventional commit format (e.g. feat:, fix:, docs:). Keep title under 72 characters.'}
+          {selectedNode.type === 'branch' && 'Isolate tasks into topic branches. Prefix branch names with feature/, bugfix/, or hotfix/.'}
+          {selectedNode.type === 'push' && 'Verify target remote and branch name before pushing to avoid overwriting shared history.'}
+          {selectedNode.type === 'pull' && 'Pull and rebase remote changes regularly to prevent large merge conflict resolutions.'}
+        </p>
+      </div>
+
       {/* Execution Log */}
       {selectedNode.config.executionLog?.command && (
         <div className="space-y-1.5">
