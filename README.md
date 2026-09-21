@@ -1,5 +1,8 @@
 # BranchWatch
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-chardiii0330-orange.svg?logo=buy-me-a-coffee&logoColor=white)](https://buymeacoffee.com/chardiii0330)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 Visual Git workflow builder, commit lineage tracker, and branch intelligence platform with live GitHub synchronization and safe execution.
 
 ---
