@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+  const origin = appUrl || (host ? `${proto}://${host}` : new URL(request.url).origin);
+
   const code = searchParams.get('code');
   const error = searchParams.get('error');
   const state = searchParams.get('state');

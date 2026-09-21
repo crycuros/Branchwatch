@@ -13,7 +13,12 @@ export async function GET(request: Request) {
 
   // Generate cryptographically secure state for CSRF defense
   const state = crypto.randomUUID();
-  const origin = new URL(request.url).origin;
+
+  // Determine base origin (supports reverse proxies, Vercel, and custom domains)
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto') || (process.env.NODE_ENV === 'production' ? 'https' : 'http');
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+  const origin = appUrl || (host ? `${proto}://${host}` : new URL(request.url).origin);
   const redirectUri = `${origin}/api/auth/callback/github`;
 
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(
