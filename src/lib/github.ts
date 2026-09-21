@@ -424,3 +424,55 @@ export async function fetchRecentActivities(owner: string, repo: string, token?:
 
   return [];
 }
+
+export async function checkUserStarredRepo(owner: string, repo: string, token: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://api.github.com/user/starred/${owner}/${repo}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    });
+    return res.status === 204;
+  } catch (err) {
+    console.error('Error checking star status:', err);
+    return false;
+  }
+}
+
+export async function starRepositoryOnGitHub(owner: string, repo: string, token: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://api.github.com/user/starred/${owner}/${repo}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Length': '0',
+      },
+    });
+    return res.status === 204;
+  } catch (err) {
+    console.error('Error starring repository on GitHub:', err);
+    return false;
+  }
+}
+
+export async function unstarRepositoryOnGitHub(owner: string, repo: string, token: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://api.github.com/user/starred/${owner}/${repo}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    });
+    return res.status === 204;
+  } catch (err) {
+    console.error('Error unstarring repository on GitHub:', err);
+    return false;
+  }
+}
+

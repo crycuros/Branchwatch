@@ -12,10 +12,16 @@ import {
   Compass,
   Sparkles,
   SlidersHorizontal,
+  Star,
+  Github,
+  Loader2,
+  Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { checkUserStarredRepo, starRepositoryOnGitHub, unstarRepositoryOnGitHub } from '@/lib/github';
 
 interface CommunityHubProps {
+  token?: string | null;
   onOpenWorkflowInCanvas: (workflow: CommunityWorkflow) => void;
   onForkWorkflowToCanvas: (workflow: CommunityWorkflow) => void;
   onOpenPublishModal: () => void;
@@ -35,6 +41,7 @@ const CATEGORIES: { id: WorkflowCategory; label: string }[] = [
 type SortOption = 'stars' | 'forks' | 'used' | 'newest';
 
 export const CommunityHub: React.FC<CommunityHubProps> = ({
+  token,
   onOpenWorkflowInCanvas,
   onForkWorkflowToCanvas,
   onOpenPublishModal,
@@ -46,11 +53,57 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<WorkflowCategory>('all');
   const [sortBy, setSortBy] = useState<SortOption>('stars');
 
+  // GitHub Repo Star State (crycuros/Branchwatch)
+  const [isGitHubStarred, setIsGitHubStarred] = useState(false);
+  const [isStarringGitHub, setIsStarringGitHub] = useState(false);
+  const [githubStarCount, setGithubStarCount] = useState<number | null>(null);
+
   // Load workflows & stars on mount
   useEffect(() => {
     setWorkflows(getCommunityWorkflows());
     setStarredIds(getStarredWorkflowIds());
-  }, []);
+
+    // Fetch repository star count & user starred status if token present
+    fetch('https://api.github.com/repos/crycuros/Branchwatch')
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d.stargazers_count === 'number') {
+          setGithubStarCount(d.stargazers_count);
+        }
+      })
+      .catch(() => {});
+
+    if (token) {
+      checkUserStarredRepo('crycuros', 'Branchwatch', token).then(setIsGitHubStarred);
+    }
+  }, [token]);
+
+  const handleGitHubStarToggle = async () => {
+    if (!token) {
+      // If no token, redirect to GitHub repo
+      window.open('https://github.com/crycuros/Branchwatch', '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setIsStarringGitHub(true);
+    try {
+      if (isGitHubStarred) {
+        const success = await unstarRepositoryOnGitHub('crycuros', 'Branchwatch', token);
+        if (success) {
+          setIsGitHubStarred(false);
+          setGithubStarCount((c) => (c !== null ? Math.max(0, c - 1) : null));
+        }
+      } else {
+        const success = await starRepositoryOnGitHub('crycuros', 'Branchwatch', token);
+        if (success) {
+          setIsGitHubStarred(true);
+          setGithubStarCount((c) => (c !== null ? c + 1 : 1));
+        }
+      }
+    } finally {
+      setIsStarringGitHub(false);
+    }
+  };
 
   const handleStarToggle = (workflowId: string) => {
     const isNowStarred = toggleStarWorkflow(workflowId);
@@ -114,7 +167,48 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={handleGitHubStarToggle}
+            disabled={isStarringGitHub}
+            title={
+              !token
+                ? 'Open repository on GitHub to star'
+                : isGitHubStarred
+                ? 'Unstar BranchWatch on GitHub'
+                : 'Star BranchWatch directly on GitHub'
+            }
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-200 apple-press ${
+              isGitHubStarred
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-transparent shadow-sm'
+                : 'bg-white/80 dark:bg-neutral-900/80 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200/80 dark:border-neutral-800'
+            } disabled:opacity-50`}
+          >
+            {isStarringGitHub ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Star
+                className={`w-3.5 h-3.5 ${
+                  isGitHubStarred ? 'fill-current text-white dark:text-neutral-900' : 'text-neutral-500'
+                }`}
+              />
+            )}
+            <span>
+              {isGitHubStarred ? 'Starred on GitHub' : 'Star on GitHub'}
+            </span>
+            {githubStarCount !== null && (
+              <span
+                className={`text-[11px] px-1.5 py-0.5 rounded-md font-mono ${
+                  isGitHubStarred
+                    ? 'bg-white/20 dark:bg-black/10'
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400'
+                }`}
+              >
+                {githubStarCount}
+              </span>
+            )}
+          </button>
+
           <Button variant="primary" size="sm" onClick={onOpenPublishModal}>
             <Plus className="w-3.5 h-3.5" />
             <span>Publish Workflow</span>

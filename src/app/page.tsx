@@ -442,6 +442,7 @@ export default function Home() {
         {activeTab === 'community' && (
           <div className="animate-fade-in w-full">
             <CommunityHub
+              token={token}
               onOpenWorkflowInCanvas={handleOpenCommunityWorkflow}
               onForkWorkflowToCanvas={handleForkCommunityWorkflow}
               onOpenPublishModal={() => setActiveTab('visual')}
