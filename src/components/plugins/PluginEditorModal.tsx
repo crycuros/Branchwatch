@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PluginNodeDefinition, PluginCategory, ConfigFieldSchema, PluginRuntime } from '@/lib/pluginTypes';
 import { PortDataType, NodePermissions } from '@/lib/workflowTypes';
 import { savePlugin } from '@/lib/pluginStorage';
@@ -23,10 +23,11 @@ import {
   Globe,
   Terminal,
   Clock,
-  Sparkles,
   AlertCircle,
   Copy,
   Check,
+  HardDrive,
+  Cpu,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -41,7 +42,7 @@ interface PluginEditorModalProps {
 
 const AVAILABLE_ICONS = [
   { name: 'Terminal', Icon: Terminal, label: 'CLI / Terminal' },
-  { name: 'ShieldCheck', Icon: Shield, label: 'Testing / Guard' },
+  { name: 'Shield', Icon: Shield, label: 'Testing / Guard' },
   { name: 'Globe', Icon: Globe, label: 'Webhook / Network' },
   { name: 'Archive', Icon: Archive, label: 'Archive / Stash' },
   { name: 'GitMerge', Icon: GitMerge, label: 'Merge / Rebase' },
@@ -134,12 +135,17 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
   );
 
   // UI Tabs
-  const [activeTab, setActiveTab] = useState<'code' | 'metadata' | 'permissions' | 'runner' | 'json'>('code');
+  const [activeTab, setActiveTab] = useState<'code' | 'permissions' | 'metadata' | 'runner' | 'json'>('code');
   const [isSaved, setIsSaved] = useState(false);
+  const [copiedJson, setCopiedJson] = useState(false);
 
   // Test Runner State
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'success' | 'failed'>('idle');
   const [testLogs, setTestLogs] = useState<{ stdout: string; stderr: string; exitCode?: number; status?: number; durationMs?: number } | null>(null);
+
+  const codeLineCount = useMemo(() => {
+    return (commandTemplate || '').split('\n').length;
+  }, [commandTemplate]);
 
   if (!isOpen) return null;
 
@@ -149,10 +155,11 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
       ...prev,
       {
         key: newKey,
-        label: 'New Parameter',
+        label: `Parameter ${prev.length + 1}`,
         type: 'text',
-        placeholder: 'Value...',
         defaultValue: '',
+        description: 'Configure runtime parameter',
+        required: false,
       },
     ]);
   };
@@ -168,53 +175,51 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
   };
 
   const handleInsertToken = (token: string) => {
-    setCommandTemplate((prev) => `${prev} ${token}`);
+    setCommandTemplate((prev) => prev + (prev.endsWith(' ') || prev.length === 0 ? '' : ' ') + token);
   };
 
   const handleTestRun = async () => {
     setTestStatus('running');
     setTestLogs(null);
-
     try {
-      const res = await fetch('/api/workflow/run-node', {
+      const response = await fetch('/api/workflow/run-node', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nodeId: id,
-          nodeTitle: name,
+          repoPath: repoPath || '',
           runtime,
-          command: runtime === 'shell' ? commandTemplate : undefined,
-          scriptContent: runtime !== 'shell' && runtime !== 'webhook' ? commandTemplate : undefined,
-          repoPath,
-          webhookConfig: runtime === 'webhook' ? { url: webhookUrl, method: webhookMethod, bodyTemplate: webhookBody } : undefined,
+          commandTemplate: runtime !== 'webhook' ? commandTemplate : undefined,
+          webhookConfig:
+            runtime === 'webhook'
+              ? {
+                  url: webhookUrl,
+                  method: webhookMethod,
+                  bodyTemplate: webhookBody,
+                }
+              : undefined,
           context: {
-            branch: currentBranch || 'main',
-            baseBranch: 'main',
-            ahead: 3,
-            behind: 0,
-            committedFiles: [{ path: 'src/index.ts', status: 'modified', additions: 12, deletions: 2 }],
+            BW_CURRENT_BRANCH: currentBranch || 'main',
+            BW_REPO_PATH: repoPath || process.cwd?.() || '',
+            BW_COMMITTED_FILES: 'src/index.ts,src/App.tsx',
+            BW_AHEAD_COUNT: '2',
+            BW_BEHIND_COUNT: '0',
           },
         }),
       });
-
-      const data = await res.json();
-      setTestLogs({
-        stdout: data.stdout || '',
-        stderr: data.stderr || '',
-        exitCode: data.exitCode,
-        status: data.status,
-        durationMs: data.durationMs,
-      });
-
-      setTestStatus(data.success ? 'success' : 'failed');
+      const data = await response.json();
+      setTestLogs(data);
+      if (data.exitCode === 0 || (data.status && data.status >= 200 && data.status < 400)) {
+        setTestStatus('success');
+      } else {
+        setTestStatus('failed');
+      }
     } catch (err: any) {
+      setTestStatus('failed');
       setTestLogs({
         stdout: '',
-        stderr: err.message || 'Execution failed',
+        stderr: err?.message || 'Failed to connect to backend execution runner.',
         exitCode: 1,
-        durationMs: 0,
       });
-      setTestStatus('failed');
     }
   };
 
@@ -225,10 +230,10 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
       name,
       version,
       description,
-      author: { name: authorName },
-      homepage: '',
-      tags: [category, runtime],
-      platforms: ['windows', 'linux', 'darwin'],
+      author: {
+        name: authorName,
+        login: authorName.toLowerCase().replace(/\s+/g, ''),
+      },
       iconName,
       category,
       runtime,
@@ -242,8 +247,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
         label: PORT_TYPES.find((p) => p.type === outputPort)?.label || 'Output',
       },
       configSchema: configFields,
-      commandTemplate: runtime === 'shell' ? commandTemplate : undefined,
-      scriptContent: runtime !== 'shell' && runtime !== 'webhook' ? commandTemplate : undefined,
+      commandTemplate: runtime !== 'webhook' ? commandTemplate : undefined,
       webhookConfig:
         runtime === 'webhook'
           ? {
@@ -271,6 +275,13 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
     }, 600);
   };
 
+  const handleCopyJson = () => {
+    const manifest = buildManifest();
+    navigator.clipboard.writeText(JSON.stringify(manifest, null, 2));
+    setCopiedJson(true);
+    setTimeout(() => setCopiedJson(false), 2000);
+  };
+
   const handleDownloadJson = () => {
     const manifest = buildManifest();
     const blob = new Blob([JSON.stringify(manifest, null, 2)], {
@@ -284,104 +295,53 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const getRuntimeFileName = () => {
+    switch (runtime) {
+      case 'nodejs':
+        return 'handler.js';
+      case 'python':
+        return 'script.py';
+      case 'webhook':
+        return 'payload.json';
+      case 'shell':
+      default:
+        return 'command.sh';
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="w-full max-w-4xl max-h-[90vh] bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden flex flex-col">
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150 font-sans">
+      <div className="w-full max-w-5xl h-[88vh] max-h-[820px] bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        {/* 1. Studio Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-900 bg-zinc-900/40">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300">
-              <Code2 className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-200">
+              <Code2 className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-zinc-100">BranchWatch Script & Node Studio</h2>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300 border border-zinc-700">
+                <h2 className="text-sm font-semibold text-zinc-100">Script & Node Studio</h2>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800/80 text-zinc-300 border border-zinc-700">
                   Schema v1
                 </span>
+                <span className="text-xs font-mono text-zinc-500">· {id}</span>
               </div>
-              <p className="text-xs text-zinc-400">
-                Author custom CLI scripts, webhooks, or portable nodes with typed inputs, outputs, and permissions.
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Author custom CLI commands, webhook integrations, and portable node extensions.
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center justify-between px-6 border-b border-zinc-900 bg-zinc-950 text-xs select-none">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setActiveTab('code')}
-              className={`py-3 px-3.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'code'
-                  ? 'border-zinc-200 text-zinc-100'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <Code2 className="w-3.5 h-3.5" />
-              Script & Code
-            </button>
-            <button
-              onClick={() => setActiveTab('permissions')}
-              className={`py-3 px-3.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'permissions'
-                  ? 'border-zinc-200 text-zinc-100'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              Permissions
-            </button>
-            <button
-              onClick={() => setActiveTab('metadata')}
-              className={`py-3 px-3.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'metadata'
-                  ? 'border-zinc-200 text-zinc-100'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <Settings2 className="w-3.5 h-3.5" />
-              Metadata & Ports
-            </button>
-            <button
-              onClick={() => setActiveTab('runner')}
-              className={`py-3 px-3.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'runner'
-                  ? 'border-zinc-200 text-zinc-100'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <Terminal className="w-3.5 h-3.5" />
-              Test Console
-            </button>
-            <button
-              onClick={() => setActiveTab('json')}
-              className={`py-3 px-3.5 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
-                activeTab === 'json'
-                  ? 'border-zinc-200 text-zinc-100'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              Manifest JSON
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-zinc-500">Runtime:</span>
+          <div className="flex items-center gap-3">
+            {/* Runtime Switcher */}
             <div className="flex items-center p-0.5 rounded-lg bg-zinc-900 border border-zinc-800">
               {(['shell', 'nodejs', 'python', 'webhook'] as PluginRuntime[]).map((r) => (
                 <button
                   key={r}
                   onClick={() => setRuntime(r)}
-                  className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors capitalize ${
+                  className={`px-2.5 py-1 rounded text-xs font-mono transition-colors capitalize ${
                     runtime === r
-                      ? 'bg-zinc-800 text-zinc-100 font-medium'
+                      ? 'bg-zinc-800 text-zinc-100 font-medium shadow-xs'
                       : 'text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
@@ -389,23 +349,106 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                 </button>
               ))}
             </div>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Tab Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        {/* 2. Subheader Tabs */}
+        <div className="flex items-center justify-between px-6 border-b border-zinc-900 bg-zinc-950 text-xs select-none">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('code')}
+              className={`py-3 px-3 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
+                activeTab === 'code'
+                  ? 'border-zinc-200 text-zinc-100 font-semibold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <Code2 className="w-3.5 h-3.5" />
+              <span>Script & Code</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('permissions')}
+              className={`py-3 px-3 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
+                activeTab === 'permissions'
+                  ? 'border-zinc-200 text-zinc-100 font-semibold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Permissions</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('metadata')}
+              className={`py-3 px-3 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
+                activeTab === 'metadata'
+                  ? 'border-zinc-200 text-zinc-100 font-semibold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              <span>Metadata & Ports</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('runner')}
+              className={`py-3 px-3 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
+                activeTab === 'runner'
+                  ? 'border-zinc-200 text-zinc-100 font-semibold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Test Sandbox</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('json')}
+              className={`py-3 px-3 border-b-2 font-medium transition-colors flex items-center gap-1.5 ${
+                activeTab === 'json'
+                  ? 'border-zinc-200 text-zinc-100 font-semibold'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <FileCode className="w-3.5 h-3.5" />
+              <span>Manifest JSON</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setActiveTab('runner');
+                handleTestRun();
+              }}
+              className="text-xs h-7 px-2.5"
+            >
+              <Play className="w-3 h-3 text-emerald-400" />
+              <span>Test Run</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* 3. Studio Content Body */}
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
           {/* TAB 1: SCRIPT & CODE */}
           {activeTab === 'code' && (
-            <div className="space-y-4">
+            <div className="h-full flex flex-col space-y-3 min-h-[380px]">
               {runtime === 'webhook' ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-4 gap-3">
                     <div className="col-span-1">
-                      <label className="text-xs font-medium text-zinc-300 block mb-1.5">Method</label>
+                      <label className="text-xs font-medium text-zinc-300 block mb-1.5">HTTP Method</label>
                       <select
                         value={webhookMethod}
                         onChange={(e) => setWebhookMethod(e.target.value as any)}
-                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200"
+                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-700 font-mono"
                       >
                         <option value="POST">POST</option>
                         <option value="GET">GET</option>
@@ -415,79 +458,111 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                       </select>
                     </div>
                     <div className="col-span-3">
-                      <label className="text-xs font-medium text-zinc-300 block mb-1.5">Webhook URL</label>
+                      <label className="text-xs font-medium text-zinc-300 block mb-1.5">Endpoint URL</label>
                       <input
                         type="text"
                         value={webhookUrl}
                         onChange={(e) => setWebhookUrl(e.target.value)}
                         placeholder="https://hooks.slack.com/services/... or http://localhost:8080/events"
-                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200"
+                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-medium text-zinc-300 block mb-1.5">
-                      JSON Request Body Template
+                  <div className="flex-1 flex flex-col space-y-2">
+                    <label className="text-xs font-medium text-zinc-300">
+                      Payload Body (JSON Template)
                     </label>
                     <textarea
-                      rows={8}
+                      rows={10}
                       value={webhookBody}
                       onChange={(e) => setWebhookBody(e.target.value)}
-                      className="w-full p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg font-mono text-xs text-zinc-200 leading-relaxed"
+                      className="w-full p-3.5 bg-zinc-900/70 border border-zinc-800 rounded-xl font-mono text-xs text-zinc-200 leading-relaxed focus:outline-none focus:border-zinc-700"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-zinc-300">
-                      {runtime === 'shell'
-                        ? 'Shell Command / CLI Script'
-                        : `${runtime === 'nodejs' ? 'Node.js' : 'Python'} Script Source`}
-                    </label>
-                    <div className="flex items-center gap-1 text-[11px] text-zinc-500 font-mono">
-                      <span>Injected Context:</span>
-                      <button
-                        onClick={() => handleInsertToken('{{BW_CURRENT_BRANCH}}')}
-                        className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
-                      >
-                        {'{{BRANCH}}'}
-                      </button>
-                      <button
-                        onClick={() => handleInsertToken('{{BW_REPO_PATH}}')}
-                        className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
-                      >
-                        {'{{REPO}}'}
-                      </button>
-                      <button
-                        onClick={() => handleInsertToken('{{BW_AHEAD_COUNT}}')}
-                        className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
-                      >
-                        {'{{AHEAD}}'}
-                      </button>
+                <div className="h-full flex flex-col space-y-3">
+                  {/* Editor Container */}
+                  <div className="flex-1 flex flex-col rounded-xl border border-zinc-800/80 bg-zinc-900/30 overflow-hidden min-h-[340px]">
+                    {/* Editor Toolbar */}
+                    <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/80 border-b border-zinc-800/80 text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-300">
+                          <FileCode className="w-3 h-3 text-zinc-400" />
+                          <span>{getRuntimeFileName()}</span>
+                        </div>
+                        <span className="text-[11px] font-mono text-zinc-500">{codeLineCount} lines</span>
+                      </div>
+
+                      {/* Injected Context Quick Chips */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-zinc-500 uppercase font-mono mr-1">Inject:</span>
+                        <button
+                          onClick={() => handleInsertToken('{{BW_CURRENT_BRANCH}}')}
+                          className="px-2 py-0.5 rounded-md bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-mono text-[11px] border border-zinc-700/60 transition-colors"
+                          title="Insert Current Branch context"
+                        >
+                          {'{{BRANCH}}'}
+                        </button>
+                        <button
+                          onClick={() => handleInsertToken('{{BW_REPO_PATH}}')}
+                          className="px-2 py-0.5 rounded-md bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-mono text-[11px] border border-zinc-700/60 transition-colors"
+                          title="Insert Workspace Path context"
+                        >
+                          {'{{REPO}}'}
+                        </button>
+                        <button
+                          onClick={() => handleInsertToken('{{BW_COMMITTED_FILES}}')}
+                          className="px-2 py-0.5 rounded-md bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-mono text-[11px] border border-zinc-700/60 transition-colors"
+                          title="Insert Staged/Committed files list"
+                        >
+                          {'{{FILES}}'}
+                        </button>
+                        <button
+                          onClick={() => handleInsertToken('{{BW_AHEAD_COUNT}}')}
+                          className="px-2 py-0.5 rounded-md bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 font-mono text-[11px] border border-zinc-700/60 transition-colors"
+                          title="Insert Divergence Count context"
+                        >
+                          {'{{AHEAD}}'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Editor Surface with Line Numbers */}
+                    <div className="flex-1 flex overflow-hidden bg-zinc-950 font-mono text-xs">
+                      {/* Line Number Gutter */}
+                      <div className="w-10 py-3 bg-zinc-950/90 border-r border-zinc-900 text-zinc-600 select-none text-right pr-2.5 font-mono text-[11px] leading-[20px]">
+                        {Array.from({ length: Math.max(codeLineCount, 12) }).map((_, i) => (
+                          <div key={i}>{i + 1}</div>
+                        ))}
+                      </div>
+
+                      {/* Code Textarea */}
+                      <textarea
+                        value={commandTemplate}
+                        onChange={(e) => setCommandTemplate(e.target.value)}
+                        placeholder={
+                          runtime === 'shell'
+                            ? '# Write CLI shell commands (e.g. npm test && git status)'
+                            : runtime === 'nodejs'
+                            ? '// Write Node.js script (access process.env.BW_CURRENT_BRANCH)'
+                            : '# Write Python script (access os.environ.get("BW_CURRENT_BRANCH"))'
+                        }
+                        className="flex-1 p-3 bg-transparent text-zinc-100 font-mono text-xs leading-[20px] resize-none focus:outline-none placeholder:text-zinc-600"
+                        spellCheck={false}
+                      />
+                    </div>
+
+                    {/* Editor Status Bar */}
+                    <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-950 border-t border-zinc-900 text-[10px] font-mono text-zinc-500">
+                      <div className="flex items-center gap-3">
+                        <span>Runtime: {runtime}</span>
+                        <span>Encoding: UTF-8</span>
+                      </div>
+                      <div>Injected: BW_REPO_PATH, BW_CURRENT_BRANCH, BW_COMMITTED_FILES</div>
                     </div>
                   </div>
-
-                  <div className="relative border border-zinc-800 rounded-lg overflow-hidden bg-zinc-950 font-mono text-xs">
-                    <textarea
-                      rows={12}
-                      value={commandTemplate}
-                      onChange={(e) => setCommandTemplate(e.target.value)}
-                      placeholder={
-                        runtime === 'shell'
-                          ? 'e.g. npm test && npm run lint'
-                          : runtime === 'nodejs'
-                          ? 'console.log("Branch:", process.env.BW_CURRENT_BRANCH);'
-                          : 'import os\nprint(os.environ.get("BW_CURRENT_BRANCH"))'
-                      }
-                      className="w-full p-4 bg-transparent text-zinc-200 font-mono text-xs leading-relaxed resize-none focus:outline-none"
-                    />
-                  </div>
-
-                  <p className="text-[11px] text-zinc-500">
-                    💡 Standard environment variables <code className="text-zinc-400 font-mono">BW_REPO_PATH</code>, <code className="text-zinc-400 font-mono">BW_CURRENT_BRANCH</code>, and <code className="text-zinc-400 font-mono">BW_COMMITTED_FILES</code> are automatically injected into the process.
-                  </p>
                 </div>
               )}
             </div>
@@ -496,21 +571,21 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
           {/* TAB 2: PERMISSIONS */}
           {activeTab === 'permissions' && (
             <div className="space-y-4">
-              <div>
-                <h3 className="text-xs font-semibold text-zinc-200">Execution Permission Matrix</h3>
+              <div className="pb-2 border-b border-zinc-900">
+                <h3 className="text-xs font-semibold text-zinc-100">Execution Permission Matrix</h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
                   Declare the exact system capabilities this node requires. Users will review and approve these permissions before first execution.
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Shell Execution */}
                 <div
                   onClick={() => setPermissions({ ...permissions, shell: !permissions.shell })}
-                  className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
+                  className={`p-4 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
                     permissions.shell
-                      ? 'border-zinc-700 bg-zinc-900/90 shadow-xs'
-                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30 hover:border-zinc-700/50'
+                      ? 'border-zinc-700 bg-zinc-900/90'
+                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30'
                   }`}
                 >
                   <div
@@ -523,12 +598,12 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     {permissions.shell && <Check className="w-3 h-3 stroke-[3]" />}
                   </div>
                   <div>
-                    <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
+                    <div className="text-xs font-medium text-zinc-100 flex items-center gap-1.5">
                       <Terminal className="w-3.5 h-3.5 text-zinc-400" />
                       <span>Shell Execution</span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">
-                      Spawns local sub-processes (PowerShell, bash, npm, docker).
+                    <div className="text-[11px] text-zinc-400 mt-0.5">
+                      Spawns local sub-processes (PowerShell, sh, npm, docker).
                     </div>
                   </div>
                 </div>
@@ -536,10 +611,10 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                 {/* Network & Webhooks */}
                 <div
                   onClick={() => setPermissions({ ...permissions, network: !permissions.network })}
-                  className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
+                  className={`p-4 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
                     permissions.network
-                      ? 'border-zinc-700 bg-zinc-900/90 shadow-xs'
-                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30 hover:border-zinc-700/50'
+                      ? 'border-zinc-700 bg-zinc-900/90'
+                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30'
                   }`}
                 >
                   <div
@@ -552,11 +627,11 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     {permissions.network && <Check className="w-3 h-3 stroke-[3]" />}
                   </div>
                   <div>
-                    <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
+                    <div className="text-xs font-medium text-zinc-100 flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5 text-blue-400" />
                       <span>Network & Webhooks</span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                    <div className="text-[11px] text-zinc-400 mt-0.5">
                       Allows outbound HTTP requests to remote APIs and services.
                     </div>
                   </div>
@@ -565,10 +640,10 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                 {/* Git Workspace Access */}
                 <div
                   onClick={() => setPermissions({ ...permissions, git: !permissions.git })}
-                  className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
+                  className={`p-4 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
                     permissions.git
-                      ? 'border-zinc-700 bg-zinc-900/90 shadow-xs'
-                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30 hover:border-zinc-700/50'
+                      ? 'border-zinc-700 bg-zinc-900/90'
+                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30'
                   }`}
                 >
                   <div
@@ -581,24 +656,27 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     {permissions.git && <Check className="w-3 h-3 stroke-[3]" />}
                   </div>
                   <div>
-                    <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
+                    <div className="text-xs font-medium text-zinc-100 flex items-center gap-1.5">
                       <GitBranch className="w-3.5 h-3.5 text-zinc-400" />
                       <span>Git Workspace Access</span>
                     </div>
-                    <div className="text-[11px] text-zinc-500 mt-0.5">
+                    <div className="text-[11px] text-zinc-400 mt-0.5">
                       Reads and modifies local Git branches, refs, and diffs.
                     </div>
                   </div>
                 </div>
 
                 {/* Filesystem Scope */}
-                <div className="p-3.5 rounded-xl border border-zinc-800/60 bg-zinc-950/40 flex items-start gap-3">
+                <div className="p-4 rounded-xl border border-zinc-800/60 bg-zinc-950/40 flex items-start gap-3">
                   <div className="w-full">
-                    <div className="text-xs font-medium text-zinc-200 mb-1.5">Filesystem Scope</div>
+                    <div className="text-xs font-medium text-zinc-100 mb-1.5 flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-zinc-400" />
+                      <span>Filesystem Scope</span>
+                    </div>
                     <select
                       value={permissions.filesystem || 'workspace'}
                       onChange={(e) => setPermissions({ ...permissions, filesystem: e.target.value as any })}
-                      className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:outline-none focus:border-zinc-700"
+                      className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
                     >
                       <option value="workspace">Workspace Repository Only</option>
                       <option value="none">No Filesystem Access</option>
@@ -620,7 +698,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200"
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
                   />
                 </div>
                 <div>
@@ -629,7 +707,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     type="text"
                     value={id}
                     onChange={(e) => setId(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200"
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
                   />
                 </div>
               </div>
@@ -640,7 +718,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                   type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200"
+                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
                 />
               </div>
 
@@ -650,13 +728,13 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200"
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
                   >
-                    <option value="testing">Testing / Guard</option>
+                    <option value="testing">Testing / Quality</option>
                     <option value="automation">Automation</option>
                     <option value="git">Git Extension</option>
                     <option value="notification">Notification</option>
-                    <option value="devops">DevOps / CI</option>
+                    <option value="devops">DevOps / Release</option>
                     <option value="custom">Custom</option>
                   </select>
                 </div>
@@ -666,7 +744,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     type="text"
                     value={authorName}
                     onChange={(e) => setAuthorName(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200"
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
                   />
                 </div>
                 <div>
@@ -675,18 +753,19 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     type="text"
                     value={version}
                     onChange={(e) => setVersion(e.target.value)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200"
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-zinc-900">
+              {/* Port Configuration */}
+              <div className="grid grid-cols-2 gap-4 pt-3 border-t border-zinc-900">
                 <div>
                   <label className="text-xs font-medium text-zinc-300 block mb-1">Input Port Type</label>
                   <select
                     value={inputPort}
                     onChange={(e) => setInputPort(e.target.value as PortDataType)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200"
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
                   >
                     {PORT_TYPES.map((p) => (
                       <option key={p.type} value={p.type}>{p.label}</option>
@@ -698,7 +777,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                   <select
                     value={outputPort}
                     onChange={(e) => setOutputPort(e.target.value as PortDataType)}
-                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-200"
+                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none focus:border-zinc-700"
                   >
                     {PORT_TYPES.map((p) => (
                       <option key={p.type} value={p.type}>{p.label}</option>
@@ -712,41 +791,41 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
           {/* TAB 4: TEST RUNNER CONSOLE */}
           {activeTab === 'runner' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-900">
                 <div>
-                  <h3 className="text-xs font-semibold text-zinc-200">Interactive Studio Test Runner</h3>
-                  <p className="text-xs text-zinc-400">
-                    Execute this node against the active workspace repository ({repoPath || 'default workspace'}).
+                  <h3 className="text-xs font-semibold text-zinc-100">Live Workspace Execution Sandbox</h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Execute this node against the active repository path ({repoPath || 'default workspace'}).
                   </p>
                 </div>
                 <button
                   onClick={handleTestRun}
                   disabled={testStatus === 'running'}
-                  className="px-4 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 text-black hover:bg-white flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 text-zinc-950 hover:bg-white flex items-center gap-1.5 transition-colors disabled:opacity-50"
                 >
                   <Play className="w-3.5 h-3.5" />
-                  {testStatus === 'running' ? 'Executing...' : 'Run Test Script'}
+                  <span>{testStatus === 'running' ? 'Executing...' : 'Run Test'}</span>
                 </button>
               </div>
 
-              <div className="p-4 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs space-y-2 min-h-[160px]">
+              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs space-y-3 min-h-[220px]">
                 {testStatus === 'idle' && (
-                  <div className="text-zinc-600 flex flex-col items-center justify-center py-8">
-                    <Terminal className="w-6 h-6 mb-2 opacity-40" />
-                    <span>Click &ldquo;Run Test Script&rdquo; to execute and inspect live terminal output.</span>
+                  <div className="text-zinc-600 flex flex-col items-center justify-center py-12">
+                    <Terminal className="w-8 h-8 mb-2 opacity-30" />
+                    <span>Click &ldquo;Run Test&rdquo; to execute and inspect live terminal output.</span>
                   </div>
                 )}
 
                 {testStatus === 'running' && (
-                  <div className="text-amber-400 flex items-center gap-2 py-4">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                    <span>Running process in workspace...</span>
+                  <div className="text-amber-400 flex items-center gap-2.5 py-6">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                    <span>Executing script in isolated runner...</span>
                   </div>
                 )}
 
                 {testLogs && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between pb-2 border-b border-zinc-900 text-[11px]">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-zinc-900 text-xs">
                       <div className="flex items-center gap-2">
                         <span
                           className={`px-2 py-0.5 rounded font-semibold ${
@@ -759,7 +838,9 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                             ? `HTTP ${testLogs.status || 200}`
                             : `Exit Code ${testLogs.exitCode ?? 0}`}
                         </span>
-                        <span className="text-zinc-400">{testStatus === 'success' ? 'Execution Passed' : 'Execution Failed'}</span>
+                        <span className="text-zinc-300 font-medium">
+                          {testStatus === 'success' ? 'Execution Passed' : 'Execution Failed'}
+                        </span>
                       </div>
                       {testLogs.durationMs !== undefined && (
                         <span className="text-zinc-500">{testLogs.durationMs}ms</span>
@@ -769,7 +850,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     {testLogs.stdout && (
                       <div>
                         <span className="text-[10px] text-zinc-500 block mb-1">STDOUT:</span>
-                        <pre className="text-zinc-300 whitespace-pre-wrap bg-zinc-900/50 p-2.5 rounded border border-zinc-900 max-h-48 overflow-y-auto">
+                        <pre className="text-zinc-200 whitespace-pre-wrap bg-zinc-900/60 p-3 rounded-lg border border-zinc-900 max-h-48 overflow-y-auto">
                           {testLogs.stdout}
                         </pre>
                       </div>
@@ -778,7 +859,7 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                     {testLogs.stderr && (
                       <div>
                         <span className="text-[10px] text-rose-400 block mb-1">STDERR:</span>
-                        <pre className="text-rose-300 whitespace-pre-wrap bg-rose-950/20 p-2.5 rounded border border-rose-950/50 max-h-48 overflow-y-auto">
+                        <pre className="text-rose-300 whitespace-pre-wrap bg-rose-950/20 p-3 rounded-lg border border-rose-950/50 max-h-48 overflow-y-auto">
                           {testLogs.stderr}
                         </pre>
                       </div>
@@ -794,45 +875,54 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-400">
-                  Save this JSON as <code className="text-zinc-300 font-mono">.branchwatch/nodes/{id}.json</code> to port it into external repos.
+                  Save this JSON as <code className="text-zinc-300 font-mono">.branchwatch/nodes/{id}.json</code> to port into any repo.
                 </span>
-                <button
-                  onClick={handleDownloadJson}
-                  className="px-3 py-1 rounded text-xs font-mono text-zinc-300 hover:text-white bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center gap-1.5 transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  Download .json
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCopyJson}
+                    className="px-3 py-1 rounded-lg text-xs font-mono text-zinc-300 hover:text-white bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center gap-1.5 transition-colors"
+                  >
+                    {copiedJson ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedJson ? 'Copied' : 'Copy'}</span>
+                  </button>
+                  <button
+                    onClick={handleDownloadJson}
+                    className="px-3 py-1 rounded-lg text-xs font-mono text-zinc-300 hover:text-white bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 flex items-center gap-1.5 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download .json</span>
+                  </button>
+                </div>
               </div>
-              <pre className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg font-mono text-xs text-zinc-300 overflow-x-auto max-h-[340px]">
+              <pre className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl font-mono text-xs text-zinc-300 overflow-x-auto max-h-[340px]">
                 {JSON.stringify(buildManifest(), null, 2)}
               </pre>
             </div>
           )}
         </div>
 
-        {/* Footer */}
+        {/* 4. Studio Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-900 bg-zinc-900/30">
           <button
             onClick={handleDownloadJson}
-            className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
-            Export Schema JSON
+            <span>Export Manifest JSON</span>
           </button>
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
+              className="px-4 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-1.5 rounded-lg text-xs font-medium text-black bg-zinc-100 hover:bg-white transition-colors flex items-center gap-1.5 shadow-sm"
+              className="px-4 py-1.5 rounded-xl text-xs font-semibold text-zinc-950 bg-zinc-100 hover:bg-white transition-colors flex items-center gap-1.5 shadow-sm"
             >
-              {isSaved ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {isSaved ? 'Saved to Palette!' : 'Save Custom Node'}
+              {isSaved ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Check className="w-3.5 h-3.5" />}
+              <span>{isSaved ? 'Saved to Palette!' : 'Save Node'}</span>
             </button>
           </div>
         </div>
