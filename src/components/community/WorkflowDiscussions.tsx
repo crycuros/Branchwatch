@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { CommunityWorkflow, WorkflowComment, WorkflowAuthor } from '@/lib/communityTypes';
-import { getWorkflowComments, addWorkflowComment } from '@/lib/communityStorage';
-import { MessageSquare, X, Send, GitCommit, User } from 'lucide-react';
+import { CommunityWorkflow } from '@/lib/communityTypes';
+import { getWorkflowComments, addWorkflowComment, DBComment } from '@/lib/communityStorage';
+import { MessageSquare, X, Send, User, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 interface WorkflowDiscussionsProps {
@@ -15,31 +15,36 @@ export const WorkflowDiscussions: React.FC<WorkflowDiscussionsProps> = ({
   onClose,
   authUser,
 }) => {
-  const [comments, setComments] = useState<WorkflowComment[]>([]);
+  const [comments, setComments] = useState<DBComment[]>([]);
   const [newCommentText, setNewCommentText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
-    if (workflow) {
-      const stored = getWorkflowComments(workflow.id);
-      setComments(stored.length > 0 ? stored : workflow.comments || []);
-    }
+    if (!workflow) return;
+    setIsLoading(true);
+    getWorkflowComments(workflow.id)
+      .then(setComments)
+      .catch(() => setComments([]))
+      .finally(() => setIsLoading(false));
   }, [workflow]);
 
   if (!workflow) return null;
 
-  const handlePostComment = (e: React.FormEvent) => {
+  const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCommentText.trim()) return;
+    if (!newCommentText.trim() || !authUser) return;
 
-    const author: WorkflowAuthor = {
-      login: authUser?.login || 'developer',
-      name: authUser?.name || 'Developer',
-      avatar_url: authUser?.avatar_url,
-    };
-
-    const added = addWorkflowComment(workflow.id, newCommentText, author);
-    setComments((prev) => [...prev, added]);
-    setNewCommentText('');
+    setIsPosting(true);
+    try {
+      const added = await addWorkflowComment(workflow.id, newCommentText.trim());
+      setComments((prev) => [...prev, added]);
+      setNewCommentText('');
+    } catch (err) {
+      console.error('Failed to post comment:', err);
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const formatTime = (iso: string) => {
@@ -75,13 +80,18 @@ export const WorkflowDiscussions: React.FC<WorkflowDiscussionsProps> = ({
             {workflow.title}
           </div>
           <div className="text-[11px] text-neutral-500 font-mono mt-0.5">
-            by @{workflow.author.login} · {workflow.version}
+            by @{workflow.author.login}
           </div>
         </div>
 
         {/* Comments Feed */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4 text-xs no-scrollbar">
-          {comments.length > 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16 text-neutral-400 gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Loading discussions...</span>
+            </div>
+          ) : comments.length > 0 ? (
             comments.map((c) => (
               <div
                 key={c.id}
@@ -89,10 +99,10 @@ export const WorkflowDiscussions: React.FC<WorkflowDiscussionsProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {c.author.avatar_url ? (
+                    {c.userAvatar ? (
                       <img
-                        src={c.author.avatar_url}
-                        alt={c.author.name}
+                        src={c.userAvatar}
+                        alt={c.userName}
                         className="w-5 h-5 rounded-full border border-neutral-200 dark:border-neutral-700"
                       />
                     ) : (
@@ -101,10 +111,10 @@ export const WorkflowDiscussions: React.FC<WorkflowDiscussionsProps> = ({
                       </div>
                     )}
                     <span className="font-semibold text-neutral-900 dark:text-neutral-100">
-                      {c.author.name}
+                      {c.userName}
                     </span>
                     <span className="text-[10px] text-neutral-500 font-mono">
-                      @{c.author.login}
+                      @{c.userLogin}
                     </span>
                   </div>
                   <span className="text-[10px] text-neutral-400 font-mono">
@@ -112,7 +122,7 @@ export const WorkflowDiscussions: React.FC<WorkflowDiscussionsProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap">
-                  {c.text}
+                  {c.body}
                 </p>
               </div>
             ))
@@ -134,23 +144,24 @@ export const WorkflowDiscussions: React.FC<WorkflowDiscussionsProps> = ({
         >
           <textarea
             rows={2}
-            placeholder="Comment or ask about this Git flow..."
+            placeholder={authUser ? 'Comment or ask about this Git flow...' : 'Connect your GitHub account to post comments'}
             value={newCommentText}
             onChange={(e) => setNewCommentText(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-none"
+            disabled={!authUser}
+            className="w-full px-3 py-2 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 text-xs text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <div className="flex items-center justify-between">
             <span className="text-[10px] text-neutral-400 font-mono">
-              Posting as @{authUser?.login || 'developer'}
+              {authUser ? `Posting as @${authUser.login}` : 'Not signed in'}
             </span>
             <Button
               variant="primary"
               size="sm"
               type="submit"
-              disabled={!newCommentText.trim()}
+              disabled={!newCommentText.trim() || !authUser || isPosting}
               className="text-xs"
             >
-              <Send className="w-3 h-3" />
+              {isPosting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
               <span>Post</span>
             </Button>
           </div>

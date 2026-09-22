@@ -1,0 +1,98 @@
+// BranchWatch Community — Prisma Schema
+// Local: SQLite  |  EC2 Production: Change provider to "postgresql"
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Community Workflow ──────────────────────────────────────────────────────
+
+model CommunityWorkflow {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String   @default("feature")
+  visibility  String   @default("public") // public | unlisted | private
+  tags        String   @default("[]")     // JSON array stored as string (SQLite)
+  nodes       String   @default("[]")     // JSON serialized workflow nodes
+  edges       String   @default("[]")     // JSON serialized workflow edges
+  isFeatured  Boolean  @default(false)
+  version     Int      @default(1)
+
+  // Author info (denormalized — from GitHub OAuth)
+  authorLogin  String
+  authorName   String
+  authorAvatar String  @default("")
+
+  // Fork attribution
+  forkedFromId    String?
+  forkedFromTitle String?
+  forkedFromLogin String?
+
+  // Counts (denormalized for fast reads)
+  starsCount Int @default(0)
+  forksCount Int @default(0)
+  usageCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  stars    WorkflowStar[]
+  forks    WorkflowFork[]
+  comments WorkflowComment[]
+
+  @@index([visibility, category])
+  @@index([authorLogin])
+}
+
+// ─── Stars ───────────────────────────────────────────────────────────────────
+
+model WorkflowStar {
+  id         String   @id @default(cuid())
+  workflowId String
+  userLogin  String
+  createdAt  DateTime @default(now())
+
+  workflow CommunityWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, userLogin])
+  @@index([userLogin])
+}
+
+// ─── Forks ───────────────────────────────────────────────────────────────────
+
+model WorkflowFork {
+  id               String   @id @default(cuid())
+  originalId       String
+  forkedWorkflowId String
+  userLogin        String
+  createdAt        DateTime @default(now())
+
+  original CommunityWorkflow @relation(fields: [originalId], references: [id], onDelete: Cascade)
+
+  @@index([originalId])
+  @@index([userLogin])
+}
+
+// ─── Comments / Discussions ──────────────────────────────────────────────────
+
+model WorkflowComment {
+  id         String   @id @default(cuid())
+  workflowId String
+  userLogin  String
+  userName   String
+  userAvatar String   @default("")
+  body       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workflow CommunityWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}

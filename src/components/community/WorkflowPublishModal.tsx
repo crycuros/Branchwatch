@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { WorkflowNode, NodeConnection } from '@/lib/workflowTypes';
 import { WorkflowCategory, WorkflowVisibility, WorkflowAuthor } from '@/lib/communityTypes';
-import { sanitizeWorkflowForPublishing, saveCommunityWorkflow } from '@/lib/communityStorage';
-import { X, Globe, Lock, EyeOff, ShieldCheck, Check, Copy } from 'lucide-react';
+import { sanitizeWorkflowForPublishing, publishCommunityWorkflow } from '@/lib/communityStorage';
+import { X, Globe, Lock, EyeOff, ShieldCheck, Check, Copy, Loader2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 interface WorkflowPublishModalProps {
@@ -35,10 +35,12 @@ export const WorkflowPublishModal: React.FC<WorkflowPublishModalProps> = ({
   const [tagsInput, setTagsInput] = useState('git-flow, best-practices');
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handlePublish = (e: React.FormEvent) => {
+  const handlePublish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
@@ -53,22 +55,21 @@ export const WorkflowPublishModal: React.FC<WorkflowPublishModalProps> = ({
       avatar_url: authUser?.avatar_url,
     };
 
-    const newWorkflow = sanitizeWorkflowForPublishing(
-      title,
-      description,
-      nodes,
-      connections,
-      author,
-      category,
-      visibility,
-      tags
-    );
+    const payload = sanitizeWorkflowForPublishing(title, description, nodes, connections, author, category, visibility, tags);
 
-    saveCommunityWorkflow(newWorkflow);
-
-    const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/?tab=community&workflow=${newWorkflow.id}`;
-    setPublishedUrl(shareUrl);
-    onPublishSuccess(newWorkflow.id);
+    setIsPublishing(true);
+    setPublishError(null);
+    try {
+      const published = await publishCommunityWorkflow(payload);
+      const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/?tab=community&workflow=${published.id}`;
+      setPublishedUrl(shareUrl);
+      onPublishSuccess(published.id);
+    } catch (err) {
+      console.error('Failed to publish workflow:', err);
+      setPublishError('Failed to publish workflow. Please try again.');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleCopyLink = () => {
@@ -231,14 +232,21 @@ export const WorkflowPublishModal: React.FC<WorkflowPublishModalProps> = ({
               </div>
             </div>
 
+            {/* Error Message */}
+            {publishError && (
+              <div className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 text-xs text-red-600 dark:text-red-400">
+                {publishError}
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-              <Button variant="ghost" size="sm" type="button" onClick={onClose}>
+              <Button variant="ghost" size="sm" type="button" onClick={onClose} disabled={isPublishing}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" type="submit" disabled={!title.trim()}>
-                <Globe className="w-3.5 h-3.5" />
-                <span>Publish Workflow</span>
+              <Button variant="primary" size="sm" type="submit" disabled={!title.trim() || isPublishing}>
+                {isPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
+                <span>{isPublishing ? 'Publishing...' : 'Publish Workflow'}</span>
               </Button>
             </div>
           </form>

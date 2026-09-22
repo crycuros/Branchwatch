@@ -1,15 +1,54 @@
-import { CommunityWorkflow, WorkflowComment, WorkflowAuthor } from './communityTypes';
-import { OFFICIAL_TEMPLATES } from './communityTemplates';
+/**
+ * communityStorage.ts — API-backed community data layer
+ *
+ * All reads/writes now go through Next.js API routes backed by SQLite (local)
+ * or PostgreSQL (EC2). Zero localStorage dependency for community data.
+ *
+ * Auth headers (x-user-login, x-user-name, x-user-avatar) are attached
+ * automatically from the authUser stored in module-level state via setCurrentUser().
+ */
+
+import { CommunityWorkflow, WorkflowAuthor } from './communityTypes';
 import { WorkflowNode, NodeConnection } from './workflowTypes';
 
-const STORAGE_KEYS = {
-  COMMUNITY_WORKFLOWS: 'branchwatch_community_workflows',
-  STARRED_WORKFLOWS: 'branchwatch_starred_workflows',
-  USER_FORKS: 'branchwatch_user_forks',
-  COMMENTS: 'branchwatch_workflow_comments',
-};
+// ─── Current User Context (set from page.tsx when token changes) ─────────────
 
-// Security Sanitizer: Cleans workflow nodes of any secrets or tokens before sharing
+let _currentUser: { login: string; name: string; avatar_url?: string } | null = null;
+
+export function setCurrentUser(user: { login: string; name: string; avatar_url?: string } | null) {
+  _currentUser = user;
+}
+
+function authHeaders(): Record<string, string> {
+  if (!_currentUser) return {};
+  return {
+    'x-user-login': _currentUser.login,
+    'x-user-name': _currentUser.name,
+    'x-user-avatar': _currentUser.avatar_url || '',
+  };
+}
+
+// ─── Fetch Helpers ────────────────────────────────────────────────────────────
+
+async function apiGet<T>(url: string): Promise<T> {
+  const res = await fetch(url, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
+  return res.json();
+}
+
+async function apiPost<T>(url: string, body?: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`POST ${url} → ${res.status}`);
+  return res.json();
+}
+
+// ─── Security Sanitizer ───────────────────────────────────────────────────────
+// Strips any tokens/secrets from node configs before publishing
+
 export function sanitizeWorkflowForPublishing(
   title: string,
   description: string,
@@ -19,175 +58,118 @@ export function sanitizeWorkflowForPublishing(
   category: CommunityWorkflow['category'] = 'feature',
   visibility: CommunityWorkflow['visibility'] = 'public',
   tags: string[] = ['git-workflow']
-): CommunityWorkflow {
-  // Strip any accidental tokens, keys, or sensitive paths
+): Omit<CommunityWorkflow, 'id' | 'createdAt' | 'updatedAt' | 'starsCount' | 'forksCount' | 'usageCount'> {
   const cleanNodes: WorkflowNode[] = nodes.map((node) => {
     const cleanConfig = { ...node.config };
-
-    // Strip sensitive execution output if it contains auth strings
-    if (cleanConfig.executionLog?.command?.includes('token') || cleanConfig.executionLog?.command?.includes('secret')) {
+    if (
+      cleanConfig.executionLog?.command?.includes('token') ||
+      cleanConfig.executionLog?.command?.includes('secret')
+    ) {
       delete cleanConfig.executionLog;
     }
-
-    return {
-      id: node.id,
-      type: node.type,
-      title: node.title,
-      x: node.x,
-      y: node.y,
-      status: 'draft' as const, // Reset status to draft for public templates
-      config: cleanConfig,
-    };
+    return { id: node.id, type: node.type, title: node.title, x: node.x, y: node.y, status: 'draft' as const, config: cleanConfig };
   });
 
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
   return {
-    id: `wf-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     slug,
     title: title.trim(),
     description: description.trim() || 'A reusable visual Git workflow.',
     category,
     visibility,
-    author: {
-      login: author.login || 'developer',
-      name: author.name || 'BranchWatch Developer',
-      avatar_url: author.avatar_url,
-    },
+    author: { login: author.login || 'developer', name: author.name || 'BranchWatch Developer', avatar_url: author.avatar_url },
     version: 'v1.0',
-    forksCount: 0,
-    starsCount: 0,
-    usageCount: 1,
     tags: tags.length > 0 ? tags : ['git-workflow'],
     nodes: cleanNodes,
     connections: [...connections],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   };
 }
 
-export function getCommunityWorkflows(): CommunityWorkflow[] {
-  if (typeof window === 'undefined') return OFFICIAL_TEMPLATES;
+// ─── Workflows ────────────────────────────────────────────────────────────────
 
-  try {
-    const custom = localStorage.getItem(STORAGE_KEYS.COMMUNITY_WORKFLOWS);
-    if (!custom) return OFFICIAL_TEMPLATES;
-
-    const parsed: CommunityWorkflow[] = JSON.parse(custom);
-    // Combine official templates with custom user published workflows
-    const customIds = new Set(parsed.map((w) => w.id));
-    const merged = [
-      ...parsed,
-      ...OFFICIAL_TEMPLATES.filter((t) => !customIds.has(t.id)),
-    ];
-    return merged;
-  } catch (e) {
-    console.error('Failed reading community workflows:', e);
-    return OFFICIAL_TEMPLATES;
-  }
+export async function getCommunityWorkflows(opts?: {
+  category?: string;
+  search?: string;
+  sort?: string;
+}): Promise<CommunityWorkflow[]> {
+  const params = new URLSearchParams();
+  if (opts?.category) params.set('category', opts.category);
+  if (opts?.search) params.set('search', opts.search);
+  if (opts?.sort) params.set('sort', opts.sort);
+  return apiGet<CommunityWorkflow[]>(`/api/community/workflows?${params.toString()}`);
 }
 
-export function saveCommunityWorkflow(workflow: CommunityWorkflow): void {
-  if (typeof window === 'undefined') return;
-
-  try {
-    const existing = getCommunityWorkflows();
-    const updated = [workflow, ...existing.filter((w) => w.id !== workflow.id)];
-    localStorage.setItem(STORAGE_KEYS.COMMUNITY_WORKFLOWS, JSON.stringify(updated));
-  } catch (e) {
-    console.error('Failed saving community workflow:', e);
-  }
+export async function publishCommunityWorkflow(
+  payload: Omit<CommunityWorkflow, 'id' | 'createdAt' | 'updatedAt' | 'starsCount' | 'forksCount' | 'usageCount'>
+): Promise<CommunityWorkflow> {
+  return apiPost<CommunityWorkflow>('/api/community/workflows', payload);
 }
 
-export function getStarredWorkflowIds(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.STARRED_WORKFLOWS);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+// ─── Stars ────────────────────────────────────────────────────────────────────
+
+export async function toggleStarWorkflow(
+  workflowId: string
+): Promise<{ starred: boolean; starsCount: number }> {
+  return apiPost<{ starred: boolean; starsCount: number }>(
+    `/api/community/workflows/${workflowId}/star`
+  );
 }
 
-export function toggleStarWorkflow(workflowId: string): boolean {
-  if (typeof window === 'undefined') return false;
-
+export async function checkStarredWorkflow(workflowId: string): Promise<boolean> {
   try {
-    const starred = getStarredWorkflowIds();
-    const isStarred = starred.includes(workflowId);
-    const updated = isStarred
-      ? starred.filter((id) => id !== workflowId)
-      : [...starred, workflowId];
-
-    localStorage.setItem(STORAGE_KEYS.STARRED_WORKFLOWS, JSON.stringify(updated));
-
-    // Update count in workflow list
-    const workflows = getCommunityWorkflows();
-    const target = workflows.find((w) => w.id === workflowId);
-    if (target) {
-      target.starsCount = Math.max(0, target.starsCount + (isStarred ? -1 : 1));
-      saveCommunityWorkflow(target);
-    }
-
-    return !isStarred;
+    const result = await apiGet<{ starred: boolean }>(
+      `/api/community/workflows/${workflowId}/star`
+    );
+    return result.starred;
   } catch {
     return false;
   }
 }
 
-export function incrementForkCount(workflowId: string): void {
-  if (typeof window === 'undefined') return;
+// ─── Forks ────────────────────────────────────────────────────────────────────
 
-  try {
-    const workflows = getCommunityWorkflows();
-    const target = workflows.find((w) => w.id === workflowId);
-    if (target) {
-      target.forksCount += 1;
-      saveCommunityWorkflow(target);
-    }
-  } catch (e) {
-    console.error('Failed incrementing fork count:', e);
-  }
+export async function forkWorkflow(workflowId: string): Promise<CommunityWorkflow> {
+  return apiPost<CommunityWorkflow>(`/api/community/workflows/${workflowId}/fork`);
 }
 
-export function getWorkflowComments(workflowId: string): WorkflowComment[] {
-  if (typeof window === 'undefined') return [];
+// ─── Comments ─────────────────────────────────────────────────────────────────
 
-  try {
-    const raw = localStorage.getItem(`${STORAGE_KEYS.COMMENTS}_${workflowId}`);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+export interface DBComment {
+  id: string;
+  workflowId: string;
+  userLogin: string;
+  userName: string;
+  userAvatar: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export function addWorkflowComment(
+export async function getWorkflowComments(workflowId: string): Promise<DBComment[]> {
+  return apiGet<DBComment[]>(`/api/community/workflows/${workflowId}/comments`);
+}
+
+export async function addWorkflowComment(workflowId: string, body: string): Promise<DBComment> {
+  return apiPost<DBComment>(`/api/community/workflows/${workflowId}/comments`, { body });
+}
+
+export async function deleteWorkflowComment(
   workflowId: string,
-  text: string,
-  author: WorkflowAuthor,
-  parentId?: string
-): WorkflowComment {
-  const newComment: WorkflowComment = {
-    id: `comment-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    workflowId,
-    author,
-    text: text.trim(),
-    createdAt: new Date().toISOString(),
-    parentId,
-  };
-
-  if (typeof window !== 'undefined') {
-    try {
-      const existing = getWorkflowComments(workflowId);
-      const updated = [...existing, newComment];
-      localStorage.setItem(`${STORAGE_KEYS.COMMENTS}_${workflowId}`, JSON.stringify(updated));
-    } catch (e) {
-      console.error('Failed saving comment:', e);
-    }
-  }
-
-  return newComment;
+  commentId: string
+): Promise<void> {
+  await fetch(`/api/community/workflows/${workflowId}/comments`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ commentId }),
+  });
 }
+
+// ─── Legacy no-ops (kept so existing call sites don't break during migration) ─
+
+/** @deprecated Use getCommunityWorkflows() async instead */
+export function getStarredWorkflowIds(): string[] { return []; }
+/** @deprecated Use forkWorkflow() async instead */
+export function incrementForkCount(_workflowId: string): void {}
+/** @deprecated Use publishCommunityWorkflow() async instead */
+export function saveCommunityWorkflow(_workflow: CommunityWorkflow): void {}

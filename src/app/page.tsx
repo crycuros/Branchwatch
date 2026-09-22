@@ -28,7 +28,7 @@ import { GitGraphView } from '@/components/v3/GitGraphView';
 import { CommunityHub } from '@/components/community/CommunityHub';
 import { WorkflowDiscussions } from '@/components/community/WorkflowDiscussions';
 import { CommunityWorkflow } from '@/lib/communityTypes';
-import { incrementForkCount } from '@/lib/communityStorage';
+import { incrementForkCount, setCurrentUser } from '@/lib/communityStorage';
 import { ShieldCheck, Github } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -119,6 +119,15 @@ export default function Home() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Sync authenticated user into communityStorage so API fetch headers are populated
+  useEffect(() => {
+    if (authUser) {
+      setCurrentUser({ login: authUser.login, name: authUser.name || authUser.login, avatar_url: authUser.avatar_url });
+    } else {
+      setCurrentUser(null);
+    }
+  }, [authUser]);
 
   const loadUserDataAndRepos = async (activeToken: string) => {
     setIsUpdating(true);

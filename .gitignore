@@ -52,3 +52,7 @@ COMMUNITY_*.md
 *_ANIMATIONS.md
 *_FEEDBACK.md
 
+# Local SQLite database (EC2 will use PostgreSQL)
+*.db
+*.db-journal
+prisma/migrations/

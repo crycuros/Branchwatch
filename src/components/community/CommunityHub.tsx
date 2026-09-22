@@ -1,10 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CommunityWorkflow, WorkflowCategory } from '@/lib/communityTypes';
-import {
-  getCommunityWorkflows,
-  getStarredWorkflowIds,
-  toggleStarWorkflow,
-} from '@/lib/communityStorage';
+import { getCommunityWorkflows, toggleStarWorkflow } from '@/lib/communityStorage';
 import { WorkflowCard } from './WorkflowCard';
 import {
   Search,
@@ -13,9 +9,7 @@ import {
   Sparkles,
   SlidersHorizontal,
   Star,
-  Github,
   Loader2,
-  Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { checkUserStarredRepo, starRepositoryOnGitHub, unstarRepositoryOnGitHub } from '@/lib/github';
@@ -40,6 +34,9 @@ const CATEGORIES: { id: WorkflowCategory; label: string }[] = [
 
 type SortOption = 'stars' | 'forks' | 'used' | 'newest';
 
+// Per-workflow starred state tracked locally after initial load
+type StarMap = Record<string, { starred: boolean; count: number }>;
+
 export const CommunityHub: React.FC<CommunityHubProps> = ({
   token,
   onOpenWorkflowInCanvas,
@@ -48,7 +45,8 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   onOpenDiscussions,
 }) => {
   const [workflows, setWorkflows] = useState<CommunityWorkflow[]>([]);
-  const [starredIds, setStarredIds] = useState<string[]>([]);
+  const [starMap, setStarMap] = useState<StarMap>({});
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<WorkflowCategory>('all');
   const [sortBy, setSortBy] = useState<SortOption>('stars');
@@ -58,19 +56,39 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   const [isStarringGitHub, setIsStarringGitHub] = useState(false);
   const [githubStarCount, setGithubStarCount] = useState<number | null>(null);
 
-  // Load workflows & stars on mount
-  useEffect(() => {
-    setWorkflows(getCommunityWorkflows());
-    setStarredIds(getStarredWorkflowIds());
+  // ─── Load workflows from DB ─────────────────────────────────────────────────
+  const loadWorkflows = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await getCommunityWorkflows({
+        category: selectedCategory,
+        search: searchQuery,
+        sort: sortBy,
+      });
+      setWorkflows(data);
 
-    // Fetch repository star count & user starred status if token present
+      // Initialize star map from fetched data
+      const map: StarMap = {};
+      data.forEach((w) => {
+        map[w.id] = { starred: false, count: w.starsCount };
+      });
+      setStarMap(map);
+    } catch (err) {
+      console.error('Failed to load community workflows:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedCategory, searchQuery, sortBy]);
+
+  useEffect(() => {
+    loadWorkflows();
+  }, [loadWorkflows]);
+
+  // ─── GitHub Repo Star (crycuros/Branchwatch) ────────────────────────────────
+  useEffect(() => {
     fetch('https://api.github.com/repos/crycuros/Branchwatch')
       .then((r) => r.json())
-      .then((d) => {
-        if (typeof d.stargazers_count === 'number') {
-          setGithubStarCount(d.stargazers_count);
-        }
-      })
+      .then((d) => { if (typeof d.stargazers_count === 'number') setGithubStarCount(d.stargazers_count); })
       .catch(() => {});
 
     if (token) {
@@ -80,69 +98,35 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
 
   const handleGitHubStarToggle = async () => {
     if (!token) {
-      // If no token, redirect to GitHub repo
       window.open('https://github.com/crycuros/Branchwatch', '_blank', 'noopener,noreferrer');
       return;
     }
-
     setIsStarringGitHub(true);
     try {
       if (isGitHubStarred) {
-        const success = await unstarRepositoryOnGitHub('crycuros', 'Branchwatch', token);
-        if (success) {
-          setIsGitHubStarred(false);
-          setGithubStarCount((c) => (c !== null ? Math.max(0, c - 1) : null));
-        }
+        const ok = await unstarRepositoryOnGitHub('crycuros', 'Branchwatch', token);
+        if (ok) { setIsGitHubStarred(false); setGithubStarCount((c) => (c !== null ? Math.max(0, c - 1) : null)); }
       } else {
-        const success = await starRepositoryOnGitHub('crycuros', 'Branchwatch', token);
-        if (success) {
-          setIsGitHubStarred(true);
-          setGithubStarCount((c) => (c !== null ? c + 1 : 1));
-        }
+        const ok = await starRepositoryOnGitHub('crycuros', 'Branchwatch', token);
+        if (ok) { setIsGitHubStarred(true); setGithubStarCount((c) => (c !== null ? c + 1 : 1)); }
       }
     } finally {
       setIsStarringGitHub(false);
     }
   };
 
-  const handleStarToggle = (workflowId: string) => {
-    const isNowStarred = toggleStarWorkflow(workflowId);
-    setStarredIds((prev) =>
-      isNowStarred ? [...prev, workflowId] : prev.filter((id) => id !== workflowId)
-    );
-    setWorkflows(getCommunityWorkflows());
+  // ─── Community Workflow Star toggle ─────────────────────────────────────────
+  const handleStarToggle = async (workflowId: string) => {
+    try {
+      const result = await toggleStarWorkflow(workflowId);
+      setStarMap((prev) => ({
+        ...prev,
+        [workflowId]: { starred: result.starred, count: result.starsCount },
+      }));
+    } catch (err) {
+      console.error('Failed to toggle star:', err);
+    }
   };
-
-  // Filter and sort workflows
-  const filteredWorkflows = useMemo(() => {
-    let result = workflows.filter((w) => w.visibility === 'public');
-
-    if (selectedCategory !== 'all') {
-      result = result.filter((w) => w.category === selectedCategory);
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        (w) =>
-          w.title.toLowerCase().includes(q) ||
-          w.description.toLowerCase().includes(q) ||
-          w.tags.some((t) => t.toLowerCase().includes(q)) ||
-          w.author.name.toLowerCase().includes(q) ||
-          w.author.login.toLowerCase().includes(q)
-      );
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      if (sortBy === 'stars') return b.starsCount - a.starsCount;
-      if (sortBy === 'forks') return b.forksCount - a.forksCount;
-      if (sortBy === 'used') return b.usageCount - a.usageCount;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-
-    return result;
-  }, [workflows, selectedCategory, searchQuery, sortBy]);
 
   const featuredWorkflows = useMemo(
     () => workflows.filter((w) => w.isFeatured && w.visibility === 'public'),
@@ -168,16 +152,11 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Star BranchWatch on GitHub */}
           <button
             onClick={handleGitHubStarToggle}
             disabled={isStarringGitHub}
-            title={
-              !token
-                ? 'Open repository on GitHub to star'
-                : isGitHubStarred
-                ? 'Unstar BranchWatch on GitHub'
-                : 'Star BranchWatch directly on GitHub'
-            }
+            title={!token ? 'Open repository on GitHub to star' : isGitHubStarred ? 'Unstar BranchWatch on GitHub' : 'Star BranchWatch directly on GitHub'}
             className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all duration-200 apple-press ${
               isGitHubStarred
                 ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-transparent shadow-sm'
@@ -187,23 +166,11 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
             {isStarringGitHub ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <Star
-                className={`w-3.5 h-3.5 ${
-                  isGitHubStarred ? 'fill-current text-white dark:text-neutral-900' : 'text-neutral-500'
-                }`}
-              />
+              <Star className={`w-3.5 h-3.5 ${isGitHubStarred ? 'fill-current' : 'text-neutral-500'}`} />
             )}
-            <span>
-              {isGitHubStarred ? 'Starred on GitHub' : 'Star on GitHub'}
-            </span>
+            <span>{isGitHubStarred ? 'Starred on GitHub' : 'Star on GitHub'}</span>
             {githubStarCount !== null && (
-              <span
-                className={`text-[11px] px-1.5 py-0.5 rounded-md font-mono ${
-                  isGitHubStarred
-                    ? 'bg-white/20 dark:bg-black/10'
-                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400'
-                }`}
-              >
+              <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-mono ${isGitHubStarred ? 'bg-white/20 dark:bg-black/10' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400'}`}>
                 {githubStarCount}
               </span>
             )}
@@ -216,20 +183,19 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
         </div>
       </div>
 
-      {/* Featured Section (if any and not searching) */}
+      {/* Featured Section */}
       {!searchQuery && selectedCategory === 'all' && featuredWorkflows.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
             <Sparkles className="w-3.5 h-3.5 text-neutral-400" />
             <span>Featured Workflow Recipes</span>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {featuredWorkflows.slice(0, 2).map((fw) => (
               <WorkflowCard
                 key={fw.id}
-                workflow={fw}
-                isStarred={starredIds.includes(fw.id)}
+                workflow={{ ...fw, starsCount: starMap[fw.id]?.count ?? fw.starsCount }}
+                isStarred={starMap[fw.id]?.starred ?? false}
                 onStarToggle={handleStarToggle}
                 onOpenWorkflow={onOpenWorkflowInCanvas}
                 onForkWorkflow={onForkWorkflowToCanvas}
@@ -243,7 +209,6 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
       {/* Search & Filter Controls */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Search Input */}
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2 select-none" />
             <input
@@ -254,8 +219,6 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
               className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200/80 dark:border-neutral-800 text-xs text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-400/40 shadow-xs"
             />
           </div>
-
-          {/* Sort Selector */}
           <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
             <SlidersHorizontal className="w-3.5 h-3.5 text-neutral-400" />
             <select
@@ -296,18 +259,29 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
       {/* Main Workflow Grid */}
       <div className="space-y-4">
         <div className="flex items-center justify-between text-xs text-neutral-400 font-mono">
-          <span>
-            {filteredWorkflows.length} workflow{filteredWorkflows.length !== 1 ? 's' : ''} found
-          </span>
+          {isLoading ? (
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin" /> Loading workflows...
+            </span>
+          ) : (
+            <span>{workflows.length} workflow{workflows.length !== 1 ? 's' : ''} found</span>
+          )}
         </div>
 
-        {filteredWorkflows.length > 0 ? (
+        {isLoading ? (
+          /* Loading Skeleton */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredWorkflows.map((workflow) => (
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-48 rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200/60 dark:border-neutral-800/60 animate-pulse" />
+            ))}
+          </div>
+        ) : workflows.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {workflows.map((workflow) => (
               <WorkflowCard
                 key={workflow.id}
-                workflow={workflow}
-                isStarred={starredIds.includes(workflow.id)}
+                workflow={{ ...workflow, starsCount: starMap[workflow.id]?.count ?? workflow.starsCount }}
+                isStarred={starMap[workflow.id]?.starred ?? false}
                 onStarToggle={handleStarToggle}
                 onOpenWorkflow={onOpenWorkflowInCanvas}
                 onForkWorkflow={onForkWorkflowToCanvas}
@@ -318,11 +292,9 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
         ) : (
           <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-white/40 dark:bg-neutral-900/20 space-y-3">
             <Compass className="w-8 h-8 text-neutral-400 mx-auto opacity-50" />
-            <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-              No workflows found
-            </h4>
+            <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">No workflows found</h4>
             <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-              No community workflows match the selected category or search filter. Try adjusting your search query or be the first to publish one!
+              No community workflows match the selected category or search filter. Try adjusting your search or be the first to publish one!
             </p>
             <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}>
               Reset Filters
