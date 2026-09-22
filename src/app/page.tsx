@@ -433,6 +433,7 @@ export default function Home() {
         {activeTab === 'visual' && (
           <div className="animate-fade-in flex-1 h-full w-full min-h-0 flex flex-col">
             <VisualWorkflow
+              token={token}
               currentBranchName={selectedBranch?.name || currentRepo?.default_branch || 'main'}
               branches={branches}
               commits={commits}

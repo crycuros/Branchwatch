@@ -3,6 +3,7 @@ import { WorkflowNode, NodeConnection, NodeType, ExecutionStep, WorkflowValidati
 import { generateGitCommands, buildNodesFromRepoData } from '@/lib/workflowGenerator';
 import { validateWorkflowGraph } from '@/lib/nodeValidation';
 import { generateExecutionPlan, executeStep } from '@/lib/workflowExecutor';
+import { executeWorkflowViaGitHub, ExecutionResult } from '@/lib/githubExecutor';
 import { Commit, Branch } from '@/lib/types';
 import { CommunityWorkflow } from '@/lib/communityTypes';
 import { NodeCanvas } from './NodeCanvas';
@@ -16,11 +17,12 @@ import {
   FolderGit2, FileCode, GitCommit, GitBranch, Download, Upload,
   Layers, Maximize2, Minimize2, Terminal as TerminalIcon, X,
   GitBranch as LogoIcon, Info, Play, CheckCircle2, AlertTriangle, XCircle, RefreshCw,
-  Globe, BookOpen, Edit3, GitFork, ArrowRight, ArrowLeft,
+  Globe, BookOpen, Edit3, GitFork, ArrowRight, ArrowLeft, ExternalLink, Sparkles,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 interface VisualWorkflowProps {
+  token?: string | null;
   currentBranchName: string;
   branches: Branch[];
   commits: Commit[];
@@ -62,6 +64,7 @@ type WorkflowRunMode = 'idle' | 'dryrun' | 'executing' | 'done';
 type ViewMode = 'editor' | 'documentation';
 
 export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
+  token,
   currentBranchName,
   branches,
   commits,
@@ -86,6 +89,7 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
   // Workflow Execution State
   const [runMode, setRunMode] = useState<WorkflowRunMode>('idle');
   const [executionPlan, setExecutionPlan] = useState<ExecutionStep[]>([]);
+  const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [validationIssues, setValidationIssues] = useState<WorkflowValidationIssue[]>([]);
   const [showValidation, setShowValidation] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
@@ -333,7 +337,66 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
   // Run Workflow — Step 2: Execute plan
   const handleConfirmExecute = async () => {
     setRunMode('executing');
+    setExecutionResult(null);
 
+    // Live Execution directly against GitHub REST API
+    if (token && repoFullName) {
+      try {
+        const result = await executeWorkflowViaGitHub(
+          nodes,
+          connections,
+          repoFullName,
+          currentBranchName || 'main',
+          token,
+          (nodeId, status, output, sha) => {
+            setNodes((prev) =>
+              prev.map((n) =>
+                n.id === nodeId
+                  ? {
+                      ...n,
+                      status,
+                      config: {
+                        ...n.config,
+                        ...(sha ? { sha } : {}),
+                        ...(output ? { executionLog: { output, completedAt: new Date().toISOString() } } : {}),
+                      },
+                    }
+                  : n
+              )
+            );
+
+            setExecutionPlan((prev) =>
+              prev.map((s) =>
+                s.nodeId === nodeId
+                  ? {
+                      ...s,
+                      status: status === 'executing' ? ('executing' as const) : status === 'success' ? ('success' as const) : ('failed' as const),
+                      output,
+                    }
+                  : s
+              )
+            );
+          },
+          () => {}
+        );
+
+        setExecutionResult(result);
+        setRunMode('done');
+        return;
+      } catch (err: any) {
+        setExecutionResult({
+          success: false,
+          stepsRun: 0,
+          totalSteps: executionPlan.length,
+          logs: [],
+          errorMessage: err.message || 'Workflow execution failed',
+        });
+        setRunMode('done');
+        return;
+      }
+    }
+
+    // Fallback: Simulation for unauthenticated demo
     let currentPlan = [...executionPlan];
 
     for (let i = 0; i < currentPlan.length; i++) {
@@ -342,7 +405,6 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
       );
       setExecutionPlan([...currentPlan]);
 
-      // Mark node as executing on canvas
       setNodes((prev) =>
         prev.map((n) => n.id === currentPlan[i].nodeId ? { ...n, status: 'executing' } : n)
       );
@@ -388,11 +450,13 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
   const handleCancelExecute = () => {
     setRunMode('idle');
     setExecutionPlan([]);
+    setExecutionResult(null);
   };
 
   const handleResetCanvas = () => {
     setRunMode('idle');
     setExecutionPlan([]);
+    setExecutionResult(null);
     setNodes((prev) => prev.map((n) => ({ ...n, status: 'draft' as const })));
   };
 
@@ -907,6 +971,105 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
             />
           </div>
         </>
+      )}
+
+      {/* Execution Result Modal */}
+      {executionResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-md animate-fade-in font-sans">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl p-6 space-y-5 animate-apple-modal"
+          >
+            {executionResult.success ? (
+              <>
+                <div className="flex items-center gap-3 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
+                      Workflow Executed on GitHub!
+                    </h3>
+                    <p className="text-xs text-neutral-500">
+                      All {executionResult.stepsRun} operations completed on {repoFullName}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  {executionResult.createdBranch && (
+                    <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/60 dark:border-neutral-700/60 space-y-1">
+                      <div className="text-[11px] text-neutral-400 uppercase font-mono">Created Branch</div>
+                      <div className="font-mono font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
+                        <GitBranch className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>{executionResult.createdBranch}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {executionResult.commitSha && (
+                    <div className="p-3 rounded-xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/60 dark:border-neutral-700/60 space-y-1">
+                      <div className="text-[11px] text-neutral-400 uppercase font-mono">New Commit Object</div>
+                      <div className="font-mono text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
+                        <span>SHA: {executionResult.commitSha.substring(0, 7)}</span>
+                        {executionResult.commitUrl && (
+                          <a
+                            href={executionResult.commitUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline font-sans text-xs"
+                          >
+                            <span>View on GitHub</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      if (executionResult.createdBranch) {
+                        onExecuteSwitchBranch(executionResult.createdBranch);
+                      }
+                      setExecutionResult(null);
+                    }}
+                  >
+                    <span>Done</span>
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 pb-3 border-b border-neutral-100 dark:border-neutral-800">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                    <XCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
+                      Workflow Execution Failed
+                    </h3>
+                    <p className="text-xs text-neutral-500">GitHub API reported an issue</p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800/40 text-xs text-rose-600 dark:text-rose-300 leading-relaxed font-mono">
+                  {executionResult.errorMessage}
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+                  <Button variant="outline" size="sm" onClick={() => setExecutionResult(null)}>
+                    <span>Close & Fix</span>
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Publish to Community Modal */}
