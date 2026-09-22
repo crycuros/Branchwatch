@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { deserializeWorkflow } from '../route';
+import { deserializeWorkflow } from '@/lib/communitySerializer';
 
 // ─── GET /api/community/workflows/[id] ───────────────────────────────────────
 export async function GET(

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { deserializeWorkflow } from '../../route';
+import { deserializeWorkflow } from '@/lib/communitySerializer';
 
 // ─── POST /api/community/workflows/[id]/fork ─────────────────────────────────
 // Fork a workflow — creates a new copy in DB with attribution

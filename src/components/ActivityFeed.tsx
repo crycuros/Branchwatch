@@ -56,15 +56,18 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities }) => {
   const formatTime = (isoStr: string) => {
     const diffMs = Date.now() - new Date(isoStr).getTime();
     if (diffMs < 0) return 'Just now';
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const totalMinutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
-    if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    if (totalMinutes < 1) return 'Just now';
+    if (totalMinutes < 60) return `${totalMinutes}m ago`;
+    if (hours < 24) {
+      return mins > 0 ? `${hours}h ${mins}m ago` : `${hours}h ago`;
+    }
     if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 30) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${diffDays}d ago`;
     return new Date(isoStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
@@ -214,7 +217,10 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ activities }) => {
                 </div>
               </div>
 
-              <div className="text-xs font-mono text-neutral-400 flex-shrink-0">
+              <div
+                title={act.timestamp ? new Date(act.timestamp).toLocaleString() : undefined}
+                className="text-xs font-mono text-neutral-400 flex-shrink-0 cursor-help"
+              >
                 {formatTime(act.timestamp)}
               </div>
             </div>

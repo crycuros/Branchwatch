@@ -54,71 +54,39 @@ export async function fetchUserRepositories(token?: string | null): Promise<Repo
     const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100&type=all', { headers });
 
     if (!res.ok) {
-      console.warn('GitHub API user repos failed:', res.status);
+      console.warn('GitHub API user repos failed:', res.status, await res.text());
       return [];
     }
 
     const repos: any[] = await res.json();
 
-    // Fetch real branch counts for each user repository
-    const enrichedRepos: Repository[] = await Promise.all(
-      repos.map(async (r) => {
-        let realBranchCount = 0;
-        let realCommitCount = 0;
+    if (!Array.isArray(repos)) {
+      console.warn('GitHub repos response was not an array:', repos);
+      return [];
+    }
 
-        try {
-          const bRes = await fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/branches?per_page=100`, { headers });
-          if (bRes.ok) {
-            const bData = await bRes.json();
-            realBranchCount = Array.isArray(bData) ? bData.length : 0;
-          } else {
-            realBranchCount = 0;
-          }
-
-          const cRes = await fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/commits?per_page=1`, { headers });
-          if (cRes.ok) {
-            const linkHeader = cRes.headers.get('link');
-            if (linkHeader) {
-              const match = linkHeader.match(/page=(\d+)>; rel="last"/);
-              if (match) {
-                realCommitCount = parseInt(match[1], 10);
-              }
-            } else {
-              const cData = await cRes.json();
-              realCommitCount = Array.isArray(cData) ? cData.length : 0;
-            }
-          } else {
-            realCommitCount = 0;
-          }
-        } catch (e) {
-          realBranchCount = 0;
-          realCommitCount = 0;
-        }
-
-        return {
-          id: r.id,
-          name: r.name,
-          full_name: r.full_name,
-          owner: {
-            login: r.owner.login,
-            avatar_url: r.owner.avatar_url,
-          },
-          private: r.private ?? false,
-          description: r.description,
-          html_url: r.html_url,
-          default_branch: r.default_branch || 'main',
-          updated_at: r.updated_at,
-          stargazers_count: r.stargazers_count || 0,
-          forks_count: r.forks_count || 0,
-          open_issues_count: r.open_issues_count || 0,
-          branches_count: realBranchCount,
-          commits_count: realCommitCount,
-          contributors_count: 1,
-        };
-      })
-    );
-
-    return enrichedRepos;
+    // Return repos immediately without individual per-repo API calls
+    // Branch/commit counts are fetched on-demand when a repo is selected
+    return repos.map((r) => ({
+      id: r.id,
+      name: r.name,
+      full_name: r.full_name,
+      owner: {
+        login: r.owner.login,
+        avatar_url: r.owner.avatar_url,
+      },
+      private: r.private ?? false,
+      description: r.description,
+      html_url: r.html_url,
+      default_branch: r.default_branch || 'main',
+      updated_at: r.updated_at,
+      stargazers_count: r.stargazers_count || 0,
+      forks_count: r.forks_count || 0,
+      open_issues_count: r.open_issues_count || 0,
+      branches_count: 0, // Loaded on repo select
+      commits_count: 0,  // Loaded on repo select
+      contributors_count: 1,
+    }));
   } catch (err) {
     console.error('Error fetching real user repositories:', err);
     return [];
@@ -367,7 +335,12 @@ export async function fetchRecentActivities(owner: string, repo: string, token?:
         const mapped: ActivityItem[] = [];
         events.forEach((e, idx) => {
           if (e.type === 'PushEvent') {
-            const commitMsg = e.payload?.commits?.[0]?.message || 'Pushed commits to branch';
+            const commits = e.payload?.commits || [];
+            const latestCommitMsg = commits.length > 0 ? commits[commits.length - 1]?.message : null;
+            const commitCount = e.payload?.size || commits.length || 1;
+            const branchName = e.payload?.ref?.replace('refs/heads/', '') || 'main';
+            const displayMsg = latestCommitMsg || `Pushed ${commitCount} commit${commitCount > 1 ? 's' : ''} to ${branchName}`;
+
             mapped.push({
               id: e.id || `evt-${idx}`,
               type: 'commit',
@@ -375,12 +348,14 @@ export async function fetchRecentActivities(owner: string, repo: string, token?:
                 name: e.actor?.display_login || e.actor?.login || 'Developer',
                 avatar_url: e.actor?.avatar_url,
               },
-              branch: e.payload?.ref?.replace('refs/heads/', '') || 'main',
-              message: commitMsg,
-              sha: e.payload?.commits?.[0]?.sha?.substring(0, 7) || e.id.substring(0, 7),
+              branch: branchName,
+              message: displayMsg,
+              sha: commits[0]?.sha?.substring(0, 7) || e.payload?.head?.substring(0, 7) || e.id.substring(0, 7),
               timestamp: e.created_at,
             });
           } else if (e.type === 'CreateEvent') {
+            const refType = e.payload?.ref_type || 'branch';
+            const refName = e.payload?.ref || 'main';
             mapped.push({
               id: e.id || `evt-${idx}`,
               type: 'branch_created',
@@ -388,8 +363,8 @@ export async function fetchRecentActivities(owner: string, repo: string, token?:
                 name: e.actor?.display_login || e.actor?.login || 'Developer',
                 avatar_url: e.actor?.avatar_url,
               },
-              branch: e.payload?.ref || 'main',
-              message: `Created ${e.payload?.ref_type || 'branch'} ${e.payload?.ref || ''}`,
+              branch: refName,
+              message: `Created ${refType} ${refName}`,
               sha: e.id.substring(0, 7),
               timestamp: e.created_at,
             });

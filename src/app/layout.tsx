@@ -4,6 +4,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'BranchWatch — Understand every branch. At a glance.',
   description: 'Track GitHub branch activity, commits, and comparisons in one clean, minimal workspace.',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

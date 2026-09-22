@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { deserializeWorkflow } from '@/lib/communitySerializer';
 
 // ─── GET /api/community/workflows ────────────────────────────────────────────
 // Fetch all public workflows with optional filtering and sorting
@@ -81,42 +82,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(deserializeWorkflow(workflow), { status: 201 });
+    return NextResponse.json(deserializeWorkflow(workflow as Record<string, unknown>), { status: 201 });
   } catch (err) {
     console.error('[POST /api/community/workflows]', err);
     return NextResponse.json({ error: 'Failed to publish workflow' }, { status: 500 });
-  }
-}
-
-// ─── Helper ──────────────────────────────────────────────────────────────────
-
-export function deserializeWorkflow(wf: Record<string, unknown>) {
-  return {
-    ...wf,
-    tags: safeParseJSON(wf.tags as string, []),
-    nodes: safeParseJSON(wf.nodes as string, []),
-    edges: safeParseJSON(wf.edges as string, []),
-    // Map DB fields to frontend CommunityWorkflow shape
-    author: {
-      login: wf.authorLogin,
-      name: wf.authorName,
-      avatar_url: wf.authorAvatar,
-    },
-    connections: safeParseJSON(wf.edges as string, []),
-    forkedFrom: wf.forkedFromId
-      ? {
-          workflowId: wf.forkedFromId,
-          title: wf.forkedFromTitle,
-          author: { login: wf.forkedFromLogin },
-        }
-      : null,
-  };
-}
-
-function safeParseJSON(str: string, fallback: unknown) {
-  try {
-    return JSON.parse(str);
-  } catch {
-    return fallback;
   }
 }
