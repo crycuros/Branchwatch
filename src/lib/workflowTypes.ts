@@ -108,6 +108,7 @@ export interface WorkflowNodeConfig {
   behindBy?: number;
   baseBranchName?: string;
   availableBranches?: string[];
+  isCurrentBranch?: boolean;
   branchCommits?: BranchCommitEntry[];
   branchFiles?: {
     path: string;

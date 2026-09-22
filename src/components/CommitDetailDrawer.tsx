@@ -1,20 +1,58 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Commit } from '@/lib/types';
-import { X, ExternalLink, FileCode, Plus, Minus, GitCommit, AlertCircle } from 'lucide-react';
+import { X, ExternalLink, FileCode, Plus, Minus, GitCommit, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from './ui/Button';
+
+import { fetchCommitDetail } from '@/lib/github';
 
 interface CommitDetailDrawerProps {
   commit: Commit | null;
+  owner?: string;
+  repo?: string;
+  token?: string | null;
   onClose: () => void;
 }
 
-export const CommitDetailDrawer: React.FC<CommitDetailDrawerProps> = ({ commit, onClose }) => {
+export const CommitDetailDrawer: React.FC<CommitDetailDrawerProps> = ({
+  commit,
+  owner,
+  repo,
+  token,
+  onClose,
+}) => {
   const [mounted, setMounted] = useState(false);
+  const [detailedCommit, setDetailedCommit] = useState<Commit | null>(commit);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setDetailedCommit(commit);
+    setExpandedFiles(new Set());
+    if (!commit) return;
+
+    // If commit already has files populated, skip
+    if (commit.files && commit.files.length > 0) return;
+
+    // Fetch full commit details from GitHub if owner and repo are available
+    if (owner && repo && commit.sha) {
+      setIsLoadingDetails(true);
+      fetchCommitDetail(owner, repo, commit.sha, token)
+        .then((data) => {
+          if (data) {
+            setDetailedCommit(data);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setIsLoadingDetails(false);
+        });
+    }
+  }, [commit, owner, repo, token]);
 
   useEffect(() => {
     if (!commit) return;
@@ -27,13 +65,35 @@ export const CommitDetailDrawer: React.FC<CommitDetailDrawerProps> = ({ commit, 
 
   if (!mounted || !commit) return null;
 
-  const authorName = commit.commit?.author?.name || commit.author?.login || 'Developer';
-  const avatar = commit.author?.avatar_url;
-  const dateStr = commit.commit?.author?.date;
+  const currentData = detailedCommit || commit;
+  const authorName = currentData.commit?.author?.name || currentData.author?.login || 'Developer';
+  const avatar = currentData.author?.avatar_url;
+  const dateStr = currentData.commit?.author?.date;
 
-  const additions = commit.stats?.additions ?? commit.files?.reduce((acc, f) => acc + f.additions, 0) ?? 0;
-  const deletions = commit.stats?.deletions ?? commit.files?.reduce((acc, f) => acc + f.deletions, 0) ?? 0;
-  const filesCount = commit.files?.length ?? 0;
+  const additions = currentData.stats?.additions ?? currentData.files?.reduce((acc, f) => acc + f.additions, 0) ?? 0;
+  const deletions = currentData.stats?.deletions ?? currentData.files?.reduce((acc, f) => acc + f.deletions, 0) ?? 0;
+  const filesCount = currentData.files?.length ?? 0;
+
+  const toggleFile = (filename: string) => {
+    setExpandedFiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(filename)) {
+        next.delete(filename);
+      } else {
+        next.add(filename);
+      }
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (!currentData.files) return;
+    if (expandedFiles.size === currentData.files.length) {
+      setExpandedFiles(new Set());
+    } else {
+      setExpandedFiles(new Set(currentData.files.map((f) => f.filename)));
+    }
+  };
 
   const formatRelativeTime = (date?: string) => {
     if (!date) return 'Recently';
@@ -51,7 +111,7 @@ export const CommitDetailDrawer: React.FC<CommitDetailDrawerProps> = ({ commit, 
       onClick={onClose}
     >
       <div
-        className="apple-glass-modal border-l border-black/[0.08] dark:border-white/[0.08] w-full max-w-lg h-full p-6 flex flex-col justify-between overflow-y-auto animate-apple-sheet"
+        className="apple-glass-modal border-l border-black/[0.08] dark:border-white/[0.08] w-full max-w-xl h-full p-6 flex flex-col justify-between overflow-y-auto animate-apple-sheet font-sans"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Drawer Navigation */}
@@ -110,28 +170,106 @@ export const CommitDetailDrawer: React.FC<CommitDetailDrawerProps> = ({ commit, 
 
           {/* Changed Files Breakdown */}
           <div className="space-y-3">
-            <h3 className="text-xs font-semibold tracking-wider text-neutral-400 uppercase">
-              Changed Files
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold tracking-wider text-neutral-400 uppercase">
+                Changed Files ({filesCount})
+              </h3>
+              {currentData.files && currentData.files.length > 0 && (
+                <button
+                  onClick={toggleAll}
+                  className="text-[11px] font-mono text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors"
+                >
+                  {expandedFiles.size === currentData.files.length ? 'Collapse all diffs' : 'Expand all diffs'}
+                </button>
+              )}
+            </div>
 
             <div className="space-y-2 font-mono text-xs">
-              {commit.files && commit.files.length > 0 ? (
-                commit.files.map((file) => (
-                  <div
-                    key={file.filename}
-                    className="p-3 rounded-lg border border-neutral-200/50 dark:border-neutral-800/60 bg-neutral-50/50 dark:bg-neutral-800/20 flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <FileCode className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
-                      <span className="truncate text-neutral-800 dark:text-neutral-200">{file.filename}</span>
-                    </div>
+              {isLoadingDetails ? (
+                <div className="p-4 rounded-lg border border-neutral-200/50 dark:border-neutral-800/60 bg-neutral-50/50 dark:bg-neutral-800/20 text-neutral-500 text-xs flex items-center gap-2 animate-pulse">
+                  <div className="w-4 h-4 rounded-full border-2 border-neutral-400 border-t-transparent animate-spin" />
+                  <span>Loading commit file diff details...</span>
+                </div>
+              ) : currentData.files && currentData.files.length > 0 ? (
+                currentData.files.map((file) => {
+                  const isExpanded = expandedFiles.has(file.filename);
+                  return (
+                    <div
+                      key={file.filename}
+                      className="rounded-xl border border-neutral-200/60 dark:border-neutral-800/80 bg-neutral-50/60 dark:bg-neutral-900/60 overflow-hidden transition-all duration-150"
+                    >
+                      {/* Clickable File Header */}
+                      <div
+                        onClick={() => toggleFile(file.filename)}
+                        className="p-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors select-none"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {isExpanded ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
+                          )}
+                          <span
+                            className={`w-4 h-4 rounded flex items-center justify-center font-mono text-[10px] font-bold flex-shrink-0 ${
+                              file.status === 'added'
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                : file.status === 'removed'
+                                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                                : file.status === 'renamed'
+                                ? 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30'
+                                : 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                            }`}
+                            title={`Status: ${file.status || 'modified'}`}
+                          >
+                            {file.status === 'added' ? 'A' : file.status === 'removed' ? 'D' : file.status === 'renamed' ? 'R' : 'M'}
+                          </span>
+                          <span className="truncate font-semibold text-neutral-900 dark:text-neutral-200">{file.filename}</span>
+                        </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0 font-medium text-[11px]">
-                      <span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
-                      <span className="text-rose-600 dark:text-rose-400">-{file.deletions}</span>
+                        <div className="flex items-center gap-2 flex-shrink-0 font-medium text-[11px]">
+                          <span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
+                          <span className="text-rose-600 dark:text-rose-400">-{file.deletions}</span>
+                        </div>
+                      </div>
+
+                      {/* Expandable Diff Patch Viewer */}
+                      {isExpanded && (
+                        <div className="border-t border-neutral-200/60 dark:border-neutral-800/80 bg-neutral-950 p-3 overflow-x-auto text-[11px] font-mono leading-relaxed">
+                          {file.patch ? (
+                            <pre className="space-y-0.5">
+                              {file.patch.split('\n').map((line, lIdx) => {
+                                const isHunk = line.startsWith('@@');
+                                const isAddition = line.startsWith('+') && !isHunk;
+                                const isDeletion = line.startsWith('-') && !isHunk;
+
+                                return (
+                                  <div
+                                    key={lIdx}
+                                    className={`px-2 py-0.5 rounded-sm whitespace-pre ${
+                                      isHunk
+                                        ? 'text-neutral-400 bg-neutral-900 font-bold my-1'
+                                        : isAddition
+                                        ? 'bg-emerald-950/50 text-emerald-300 font-medium'
+                                        : isDeletion
+                                        ? 'bg-rose-950/50 text-rose-300 font-medium'
+                                        : 'text-neutral-400'
+                                    }`}
+                                  >
+                                    {line}
+                                  </div>
+                                );
+                              })}
+                            </pre>
+                          ) : (
+                            <div className="p-3 text-neutral-500 text-xs italic">
+                              Binary file or large diff not rendered inline.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="p-4 rounded-lg border border-neutral-200/50 dark:border-neutral-800/60 bg-neutral-50/50 dark:bg-neutral-800/20 text-neutral-500 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-neutral-400" />
@@ -150,7 +288,7 @@ export const CommitDetailDrawer: React.FC<CommitDetailDrawerProps> = ({ commit, 
             rel="noreferrer"
             className="w-full block"
           >
-            <Button variant="primary" size="md" className="w-full">
+            <Button variant="primary" size="md" className="w-full font-semibold">
               <ExternalLink className="w-4 h-4" />
               <span>View commit on GitHub</span>
             </Button>

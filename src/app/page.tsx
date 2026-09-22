@@ -399,7 +399,7 @@ export default function Home() {
         authUser={authUser}
       >
         {activeTab === 'overview' && currentRepo && (
-          <div className="space-y-8 animate-fade-in">
+          <div className="flex-1 h-full overflow-y-auto p-4 sm:p-6 md:p-8 space-y-8 animate-fade-in">
             <RepositoryHeader
               repo={currentRepo}
               onBackToRepos={() => setActiveTab('repositories')}
@@ -436,7 +436,7 @@ export default function Home() {
 
         {/* TAB 2: GIT GRAPH */}
         {activeTab === 'graph' && (
-          <div className="animate-fade-in">
+          <div className="flex-1 h-full overflow-y-auto p-4 sm:p-6 md:p-8 animate-fade-in">
             <GitGraphView
               branches={branches}
               commits={commits}
@@ -468,7 +468,7 @@ export default function Home() {
 
         {/* TAB 4: COMMUNITY WORKFLOW HUB */}
         {activeTab === 'community' && (
-          <div className="animate-fade-in w-full">
+          <div className="flex-1 h-full overflow-y-auto p-4 sm:p-6 md:p-8 animate-fade-in w-full">
             <CommunityHub
               token={token}
               onOpenWorkflowInCanvas={handleOpenCommunityWorkflow}
@@ -500,8 +500,9 @@ export default function Home() {
           </div>
         )}
 
+        {/* TAB 7: REPOSITORY SELECTOR */}
         {activeTab === 'repositories' && (
-          <div className="animate-fade-in">
+          <div className="flex-1 h-full overflow-y-auto p-4 sm:p-6 md:p-8 animate-fade-in">
             <RepositorySelector
               repositories={repositories}
               selectedRepo={currentRepo}
@@ -514,14 +515,16 @@ export default function Home() {
           </div>
         )}
 
+        {/* TAB 8: ACTIVITY FEED */}
         {activeTab === 'activity' && (
-          <div className="animate-fade-in">
+          <div className="flex-1 h-full overflow-y-auto p-4 sm:p-6 md:p-8 animate-fade-in">
             <ActivityFeed activities={activities} />
           </div>
         )}
 
+        {/* TAB 9: BRANCH COMPARE */}
         {activeTab === 'compare' && currentRepo && (
-          <div className="animate-fade-in">
+          <div className="flex-1 h-full overflow-y-auto p-4 sm:p-6 md:p-8 animate-fade-in">
             <BranchCompare
               owner={currentRepo.owner.login}
               repoName={currentRepo.name}
@@ -555,6 +558,9 @@ export default function Home() {
 
       <CommitDetailDrawer
         commit={selectedCommit}
+        owner={currentRepo?.owner.login}
+        repo={currentRepo?.name}
+        token={token}
         onClose={() => setSelectedCommit(null)}
       />
 

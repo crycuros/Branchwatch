@@ -56,8 +56,17 @@ export async function GET(request: Request) {
       availableBranches = ['main'];
     }
 
-    // 2. Get current active branch if not specified
+    // 2. Get current active branch if not specified or invalid
     let targetBranch = branch;
+    if (targetBranch) {
+      try {
+        await execAsync(`git rev-parse --verify ${targetBranch}`, { cwd });
+      } catch {
+        // Requested branch doesn't exist locally, fallback to active or first available
+        targetBranch = null;
+      }
+    }
+
     if (!targetBranch) {
       try {
         const { stdout: bOut } = await execAsync('git branch --show-current', { cwd });
@@ -69,15 +78,24 @@ export async function GET(request: Request) {
 
     // 3. Check if base branch exists locally, fallback if needed
     let effectiveBase = base;
+    let baseValid = false;
     try {
       await execAsync(`git rev-parse --verify ${effectiveBase}`, { cwd });
+      baseValid = true;
     } catch {
       try {
-        await execAsync(`git rev-parse --verify master`, { cwd });
-        effectiveBase = 'master';
+        await execAsync(`git rev-parse --verify main`, { cwd });
+        effectiveBase = 'main';
+        baseValid = true;
       } catch {
-        // Fallback to targetBranch or first available
-        effectiveBase = availableBranches.find((b) => b !== targetBranch) || targetBranch;
+        try {
+          await execAsync(`git rev-parse --verify master`, { cwd });
+          effectiveBase = 'master';
+          baseValid = true;
+        } catch {
+          effectiveBase = availableBranches.find((b) => b !== targetBranch) || targetBranch;
+          baseValid = effectiveBase === targetBranch;
+        }
       }
     }
 
@@ -85,7 +103,7 @@ export async function GET(request: Request) {
     let ahead = 0;
     let behind = 0;
 
-    if (effectiveBase !== targetBranch) {
+    if (baseValid && effectiveBase !== targetBranch) {
       try {
         const { stdout: revOut } = await execAsync(
           `git rev-list --left-right --count ${effectiveBase}...${targetBranch}`,
@@ -96,16 +114,14 @@ export async function GET(request: Request) {
           behind = parseInt(parts[0], 10) || 0;
           ahead = parseInt(parts[1], 10) || 0;
         }
-      } catch (err) {
-        console.error('Error checking rev-list:', err);
-      }
+      } catch {}
     }
 
     // 5. Branch Commit Stack History (git log <base>..<target> or last 10 on <target>)
     const commits: BranchCommitInfo[] = [];
     try {
       let logCmd = `git log --pretty=format:"%H|%s|%an|%cI" -n 25 ${effectiveBase}..${targetBranch}`;
-      if (effectiveBase === targetBranch) {
+      if (!baseValid || effectiveBase === targetBranch) {
         logCmd = `git log --pretty=format:"%H|%s|%an|%cI" -n 10 ${targetBranch}`;
       }
 
@@ -142,16 +158,14 @@ export async function GET(request: Request) {
           }
         });
       }
-    } catch (err) {
-      console.error('Error fetching branch commits log:', err);
-    }
+    } catch {}
 
     // 6. Committed files calculation: git diff --numstat <base>...<target>
     const files: BranchFileInfo[] = [];
     let totalAdditions = 0;
     let totalDeletions = 0;
 
-    if (effectiveBase !== targetBranch) {
+    if (baseValid && effectiveBase !== targetBranch) {
       try {
         const { stdout: diffOut } = await execAsync(
           `git diff --numstat ${effectiveBase}...${targetBranch}`,
@@ -181,9 +195,7 @@ export async function GET(request: Request) {
             });
           }
         });
-      } catch (err) {
-        console.error('Error running diff numstat:', err);
-      }
+      } catch {}
     }
 
     const payload: BranchComparisonInfo = {

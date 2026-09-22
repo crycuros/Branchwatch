@@ -162,6 +162,7 @@ export function buildNodesFromRepoData(
       config: {
         branchName: activeBranchName,
         sha: activeBranch?.commit?.sha?.substring(0, 7),
+        isCurrentBranch: true,
       },
     });
     connections.push({ id: `conn-commit-${branch1Id}`, fromId: commitId, toId: branch1Id });
@@ -194,6 +195,7 @@ export function buildNodesFromRepoData(
       config: {
         branchName: branch2Name,
         sha: secondaryBranch?.commit?.sha?.substring(0, 7),
+        isCurrentBranch: false,
       },
     });
     connections.push({ id: `conn-commit-${branch2Id}`, fromId: commitId, toId: branch2Id });
@@ -218,13 +220,14 @@ export function buildNodesFromRepoData(
     nodes.push({
       id: branchId,
       type: 'branch',
-      title: 'Branch',
+      title: 'Branch (Active)',
       x: 1020,
       y: 200,
       status: 'ready',
       config: {
         branchName: activeBranchName,
         sha: activeBranch?.commit?.sha?.substring(0, 7),
+        isCurrentBranch: true,
       },
     });
     connections.push({ id: `conn-commit-branch`, fromId: commitId, toId: branchId });

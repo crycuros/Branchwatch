@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { VisualDiffModal } from './VisualDiffModal';
+import { ThreeGitTreeCanvas } from '../visual/ThreeGitTreeCanvas';
+import { Box, Layers } from 'lucide-react';
 
 interface GitGraphViewProps {
   branches: Branch[];
@@ -58,6 +60,7 @@ export const GitGraphView: React.FC<GitGraphViewProps> = ({
   repo,
   token,
 }) => {
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const [selectedBranch, setSelectedBranch] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCommitForDiff, setSelectedCommitForDiff] = useState<Commit | null>(null);
@@ -98,9 +101,9 @@ export const GitGraphView: React.FC<GitGraphViewProps> = ({
             <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
               Git History Graph
             </h1>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
               Topological visual commit graph and branch rails.
-            </p>
+            </div>
           </div>
         </div>
 
@@ -159,8 +162,34 @@ export const GitGraphView: React.FC<GitGraphViewProps> = ({
           </p>
         </div>
 
-        {/* Search & Branch Filter */}
+        {/* Search, Branch Filter & 2D/3D Mode Switcher */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 2D vs 3D Switcher */}
+          <div className="flex items-center p-0.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs">
+            <button
+              onClick={() => setViewMode('2d')}
+              className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors ${
+                viewMode === '2d'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>2D Rails</span>
+            </button>
+            <button
+              onClick={() => setViewMode('3d')}
+              className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-colors ${
+                viewMode === '3d'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs font-semibold'
+                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              <Box className="w-3.5 h-3.5 text-emerald-500" />
+              <span>3D Tree</span>
+            </button>
+          </div>
+
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
@@ -192,9 +221,22 @@ export const GitGraphView: React.FC<GitGraphViewProps> = ({
         </div>
       </div>
 
-      {/* Main Graph Container with Frosted Glass */}
-      <div className="rounded-2xl apple-glass-card overflow-hidden">
-        {/* Branch Legend */}
+      {/* 3D Spatial Tree View or 2D Graph Container */}
+      {viewMode === '3d' ? (
+        <div className="h-[620px] w-full rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-[#07080a] overflow-hidden shadow-subtle relative animate-fade-in">
+          <ThreeGitTreeCanvas
+            branches={branches}
+            commits={commits}
+            onSelectCommit={(hash) => {
+              const found = commits.find((c) => c.sha.startsWith(hash) || hash.startsWith(c.sha.slice(0, 7)));
+              if (found) setSelectedCommitForDiff(found);
+            }}
+          />
+        </div>
+      ) : (
+        /* Main Graph Container with Frosted Glass */
+        <div className="rounded-2xl apple-glass-card overflow-hidden">
+          {/* Branch Legend */}
         {branches.length > 0 && (
           <div className="px-5 py-3 border-b border-black/[0.05] dark:border-white/[0.05] flex items-center gap-2.5 overflow-x-auto text-xs bg-black/[0.02] dark:bg-white/[0.02]">
             <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider flex items-center gap-1">
@@ -394,6 +436,7 @@ export const GitGraphView: React.FC<GitGraphViewProps> = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* Real Visual Diff Modal */}
       {selectedCommitForDiff && (

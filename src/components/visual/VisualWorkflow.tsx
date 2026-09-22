@@ -221,33 +221,42 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
     { nodes: initialWorkflow?.nodes || INITIAL_NODES, connections: initialWorkflow?.connections || INITIAL_CONNECTIONS },
   ]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const lastHydratedKeyRef = React.useRef<string>('');
 
   // Hydrate canvas from initialWorkflow if provided, or live repo data
   useEffect(() => {
+    const currentKey = `${repoFullName || ''}:${currentBranchName}:${initialWorkflow ? initialWorkflow.id : 'live'}`;
+    
     if (initialWorkflow) {
-      setNodes(initialWorkflow.nodes);
-      setConnections(initialWorkflow.connections);
-      setHistory([{ nodes: initialWorkflow.nodes, connections: initialWorkflow.connections }]);
-      setHistoryIndex(0);
-      setForkMeta(initialWorkflow.forkedFrom || null);
-      if (initialWorkflow.nodes.length > 0) setSelectedNodeId(initialWorkflow.nodes[0].id);
+      if (lastHydratedKeyRef.current !== currentKey) {
+        lastHydratedKeyRef.current = currentKey;
+        setNodes(initialWorkflow.nodes);
+        setConnections(initialWorkflow.connections);
+        setHistory([{ nodes: initialWorkflow.nodes, connections: initialWorkflow.connections }]);
+        setHistoryIndex(0);
+        setForkMeta(initialWorkflow.forkedFrom || null);
+        if (initialWorkflow.nodes.length > 0) setSelectedNodeId(initialWorkflow.nodes[0].id);
+      }
       return;
     }
 
-    const { nodes: liveNodes, connections: liveConns } = buildNodesFromRepoData(
-      currentBranchName,
-      branches,
-      commits
-    );
-    setNodes(liveNodes);
-    setConnections(liveConns);
-    setHistory([{ nodes: liveNodes, connections: liveConns }]);
-    setHistoryIndex(0);
-    setLastSyncTime(new Date());
+    if (lastHydratedKeyRef.current !== currentKey) {
+      lastHydratedKeyRef.current = currentKey;
+      const { nodes: liveNodes, connections: liveConns } = buildNodesFromRepoData(
+        currentBranchName,
+        branches,
+        commits
+      );
+      setNodes(liveNodes);
+      setConnections(liveConns);
+      setHistory([{ nodes: liveNodes, connections: liveConns }]);
+      setHistoryIndex(0);
+      setLastSyncTime(new Date());
 
-    const firstInteresting = liveNodes.find((n) => n.type === 'commit' || n.type === 'branch');
-    if (firstInteresting) setSelectedNodeId(firstInteresting.id);
-  }, [commits, branches, currentBranchName, initialWorkflow]);
+      const firstInteresting = liveNodes.find((n) => n.type === 'commit' || n.type === 'branch');
+      if (firstInteresting) setSelectedNodeId(firstInteresting.id);
+    }
+  }, [commits, branches, currentBranchName, initialWorkflow, repoFullName]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -412,43 +421,100 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
     // Mark as executing
     setNodes((prev) => prev.map((n) => n.id === node.id ? { ...n, status: 'executing' } : n));
 
-    await new Promise((r) => setTimeout(r, 800));
+    await new Promise((r) => setTimeout(r, 600));
 
-    if (node.type === 'commit') {
-      const msg = node.config.commitMessage || 'Update repository';
-      await onExecuteCommit(msg);
-      const sha = Math.random().toString(16).substring(2, 9);
+    try {
+      if (node.type === 'commit') {
+        const msg = node.config.commitMessage?.trim() || 'Update repository';
+        await onExecuteCommit(msg);
+        const sha = Math.random().toString(16).substring(2, 9);
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.id === node.id
+              ? {
+                  ...n,
+                  status: 'success',
+                  config: {
+                    ...n.config,
+                    sha,
+                    committedAt: new Date().toISOString(),
+                    executionLog: {
+                      command: `git commit -m "${msg}"`,
+                      output: `[${currentBranchName} ${sha}] ${msg}\n 2 files changed`,
+                      completedAt: new Date().toISOString(),
+                    },
+                  },
+                }
+              : n
+          )
+        );
+      } else if (node.type === 'stage') {
+        await onExecuteStage();
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.id === node.id
+              ? {
+                  ...n,
+                  status: 'success',
+                  config: {
+                    ...n.config,
+                    executionLog: {
+                      command: 'git add .',
+                      output: 'Changes staged for commit',
+                      completedAt: new Date().toISOString(),
+                    },
+                  },
+                }
+              : n
+          )
+        );
+      } else if (node.type === 'branch' && node.config.branchName) {
+        await onExecuteSwitchBranch(node.config.branchName);
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.id === node.id
+              ? {
+                  ...n,
+                  status: 'success',
+                  config: {
+                    ...n.config,
+                    executionLog: {
+                      command: `git switch ${node.config.branchName}`,
+                      output: `Switched to branch '${node.config.branchName}'`,
+                      completedAt: new Date().toISOString(),
+                    },
+                  },
+                }
+              : n
+          )
+        );
+      } else {
+        // For pull/push/working_tree — simulate
+        await new Promise((r) => setTimeout(r, 400));
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.id === node.id ? { ...n, status: 'success' } : n
+          )
+        );
+      }
+    } catch (err: any) {
       setNodes((prev) =>
         prev.map((n) =>
           n.id === node.id
-            ? { ...n, status: 'success', config: { ...n.config, sha, committedAt: new Date().toISOString(), executionLog: { command: `git commit -m "${msg}"`, output: `[${currentBranchName} ${sha}] ${msg}\n 2 files changed`, completedAt: new Date().toISOString() } } }
+            ? {
+                ...n,
+                status: 'failed',
+                config: {
+                  ...n.config,
+                  executionLog: {
+                    command: `git ${node.type}`,
+                    output: err?.message || 'Action failed to execute',
+                    error: err?.message,
+                    completedAt: new Date().toISOString(),
+                  },
+                },
+              }
             : n
-        )
-      );
-    } else if (node.type === 'stage') {
-      await onExecuteStage();
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.id === node.id
-            ? { ...n, status: 'success', config: { ...n.config, executionLog: { command: 'git add .', output: 'Changes staged for commit', completedAt: new Date().toISOString() } } }
-            : n
-        )
-      );
-    } else if (node.type === 'branch' && node.config.branchName) {
-      await onExecuteSwitchBranch(node.config.branchName);
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.id === node.id
-            ? { ...n, status: 'success', config: { ...n.config, executionLog: { command: `git switch ${node.config.branchName}`, output: `Switched to branch '${node.config.branchName}'`, completedAt: new Date().toISOString() } } }
-            : n
-        )
-      );
-    } else {
-      // For pull/push/working_tree — simulate
-      await new Promise((r) => setTimeout(r, 600));
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.id === node.id ? { ...n, status: 'success' } : n
         )
       );
     }

@@ -111,7 +111,7 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
         onContextMenu(e, node);
       }}
       style={{ left: `${node.x}px`, top: `${node.y}px` }}
-      className={`absolute w-72 rounded-2xl border apple-glass-card shadow-apple dark:shadow-apple-dark transition-all duration-200 select-none group cursor-grab active:cursor-grabbing ${
+      className={`absolute w-72 rounded-2xl border apple-glass-card shadow-apple dark:shadow-apple-dark transition-[border-color,box-shadow,background-color] duration-150 select-none group cursor-grab active:cursor-grabbing ${
         node.status === 'executing'
           ? 'border-amber-500/50 ring-2 ring-amber-500/20'
           : node.status === 'failed'
@@ -343,16 +343,22 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
               </div>
             )}
 
-            {node.status !== 'success' && (
+            {/* Branch Action: Active Status vs Switch Action */}
+            {node.title?.includes('(Active)') || node.config.isCurrentBranch ? (
+              <div className="w-full py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-center font-mono text-[11px] font-semibold border border-emerald-500/20 flex items-center justify-center gap-1.5 select-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>Current Active Branch</span>
+              </div>
+            ) : node.status !== 'success' ? (
               <Button
                 variant="outline"
                 size="sm"
                 className="w-full text-xs font-medium"
                 onClick={(e) => { e.stopPropagation(); onExecuteAction(node); }}
               >
-                Switch to Branch
+                Switch to {node.config.branchName || 'Branch'}
               </Button>
-            )}
+            ) : null}
           </div>
         )}
 

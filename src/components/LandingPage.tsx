@@ -60,11 +60,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // GitHub Star Count
   const [starCount, setStarCount] = useState<number | null>(null);
 
-  // Scroll tracking state with Continuous LERP Damping
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Scroll tracking state
   const [scrollY, setScrollY] = useState(0);
-  const targetScrollY = useRef(0);
-  const currentScrollY = useRef(0);
   const [activeFeatureIndex, setActiveFeatureIndex] = useState(0);
 
   useEffect(() => {
@@ -77,57 +74,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         }
       })
       .catch(() => {});
-  }, []);
-
-  // Silky Smooth LERP Animation Frame Loop
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    let animId: number;
-
-    const loop = () => {
-      const diff = targetScrollY.current - currentScrollY.current;
-      if (Math.abs(diff) > 0.05) {
-        currentScrollY.current += diff * 0.09;
-        setScrollY(currentScrollY.current);
-
-        const maxScroll = container.scrollHeight - container.clientHeight || 1;
-        const scrollProgress = currentScrollY.current / maxScroll;
-
-        if (scrollProgress < 0.32) {
-          setActiveFeatureIndex(0);
-        } else if (scrollProgress < 0.65) {
-          setActiveFeatureIndex(1);
-        } else {
-          setActiveFeatureIndex(2);
-        }
-      }
-      animId = requestAnimationFrame(loop);
-    };
 
     const handleScroll = () => {
-      targetScrollY.current = container.scrollTop;
+      const scrollPos = window.scrollY || document.documentElement.scrollTop;
+      setScrollY(scrollPos);
     };
 
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    animId = requestAnimationFrame(loop);
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      cancelAnimationFrame(animId);
-    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  // Auto-cycle showcase tabs gently if user is near top
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (scrollY < 150) {
-        setActiveFeatureIndex((prev) => (prev + 1) % 3);
-      }
-    }, 4500);
-    return () => clearInterval(timer);
-  }, [scrollY]);
 
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,9 +106,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   return (
     <div
-      ref={scrollContainerRef}
-      className="h-screen w-screen overflow-y-auto overflow-x-hidden bg-neutral-50 dark:bg-[#08090a] text-neutral-900 dark:text-neutral-100 font-sans selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-neutral-900 scroll-smooth"
-      style={{ WebkitOverflowScrolling: 'touch' }}
+      className="min-h-screen w-full overflow-x-hidden bg-neutral-50 dark:bg-[#08090a] text-neutral-900 dark:text-neutral-100 font-sans selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-neutral-900"
     >
       {/* 1. Sticky Frosted Glass Navbar */}
       <header className="sticky top-0 z-50 w-full apple-glass transition-all duration-200 border-b border-black/[0.06] dark:border-white/[0.06]">
@@ -161,7 +114,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center gap-8">
             <div
               onClick={() => {
-                if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="flex items-center gap-2.5 cursor-pointer select-none"
             >
@@ -247,7 +200,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {/* Release Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold">BranchWatch v1.0 Production</span>
+            <span className="font-semibold">BranchWatch v1.0</span>
             <span className="text-neutral-400">·</span>
             <span>Extensible Git Graph & Automation Engine</span>
           </div>
@@ -297,36 +250,69 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Card 1 */}
-          <div className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700">
-              <Workflow className="w-5 h-5" />
+          <div
+            onClick={() => handleOpenTabDirect('visual')}
+            className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle hover:shadow-xl hover:border-neutral-400 dark:hover:border-neutral-700 transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+          >
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700 group-hover:scale-105 transition-transform duration-200">
+                <Workflow className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-950 dark:group-hover:text-white">
+                Visual Node Canvas
+              </h3>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Connect working tree changes, stage, commit, branch, and remote nodes with typed input and output ports on an infinite visual canvas.
+              </p>
             </div>
-            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">Visual Node Canvas</h3>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              Connect working tree changes, stage, commit, branch, and remote nodes with typed input and output ports on an infinite visual canvas.
-            </p>
+            <div className="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center text-xs font-semibold text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white">
+              <span>Open Canvas</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform duration-200 group-hover:translate-x-1" />
+            </div>
           </div>
 
           {/* Card 2 */}
-          <div className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700">
-              <Code2 className="w-5 h-5" />
+          <div
+            onClick={() => handleOpenTabDirect('developer')}
+            className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle hover:shadow-xl hover:border-neutral-400 dark:hover:border-neutral-700 transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+          >
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700 group-hover:scale-105 transition-transform duration-200">
+                <Code2 className="w-5 h-5" />
+              </div>
+              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-950 dark:group-hover:text-white">
+                Script & Node Studio
+              </h3>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Author Shell, Node.js, Python, and Webhook tasks. Zero-config auto-discovery via <code className="font-mono text-neutral-800 dark:text-neutral-200">.branchwatch/nodes/*.json</code>.
+              </p>
             </div>
-            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">Script & Node Studio</h3>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              Author Shell, Node.js, Python, and Webhook tasks. Zero-config auto-discovery via <code className="font-mono text-neutral-800 dark:text-neutral-200">.branchwatch/nodes/*.json</code>.
-            </p>
+            <div className="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center text-xs font-semibold text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white">
+              <span>Launch Studio</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform duration-200 group-hover:translate-x-1" />
+            </div>
           </div>
 
           {/* Card 3 */}
-          <div className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700">
-              <ShieldCheck className="w-5 h-5 text-emerald-500" />
+          <div
+            onClick={() => openLegalDialog('security')}
+            className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle hover:shadow-xl hover:border-neutral-400 dark:hover:border-neutral-700 transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+          >
+            <div className="space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700 group-hover:scale-105 transition-transform duration-200">
+                <ShieldCheck className="w-5 h-5 text-emerald-500" />
+              </div>
+              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-950 dark:group-hover:text-white">
+                Security Clearance Model
+              </h3>
+              <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                Declared permissions (<code className="font-mono text-neutral-800 dark:text-neutral-200">shell</code>, <code className="font-mono text-neutral-800 dark:text-neutral-200">fs</code>, <code className="font-mono text-neutral-800 dark:text-neutral-200">network</code>) gated by explicit user consent. Zero automatic remote pushes.
+              </p>
             </div>
-            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">Security Clearance Model</h3>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-              Declared permissions (<code className="font-mono text-neutral-800 dark:text-neutral-200">shell</code>, <code className="font-mono text-neutral-800 dark:text-neutral-200">fs</code>, <code className="font-mono text-neutral-800 dark:text-neutral-200">network</code>) gated by explicit user consent. Zero automatic remote pushes.
-            </p>
+            <div className="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center text-xs font-semibold text-neutral-700 dark:text-neutral-300 group-hover:text-neutral-900 dark:group-hover:text-white">
+              <span>View Clearance Matrix</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1 transition-transform duration-200 group-hover:translate-x-1" />
+            </div>
           </div>
         </div>
       </section>

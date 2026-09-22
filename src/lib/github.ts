@@ -89,20 +89,29 @@ export async function fetchUserRepositories(token?: string | null): Promise<Repo
           contributors_count: 1,
         };
 
+        // If repo is empty (size === 0 or no commits), return immediately without 409 requests
+        if (r.size === 0 || !r.default_branch) {
+          return {
+            ...baseRepo,
+            branches_count: 0,
+            commits_count: 0,
+          };
+        }
+
         try {
           const [bRes, cRes] = await Promise.all([
-            fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/branches?per_page=100`, { headers }),
-            fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/commits?per_page=1`, { headers }),
+            fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/branches?per_page=100`, { headers }).catch(() => null),
+            fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/commits?per_page=1`, { headers }).catch(() => null),
           ]);
 
           let realBranchCount = 1;
-          if (bRes.ok) {
+          if (bRes && bRes.ok) {
             const bData = await bRes.json();
             if (Array.isArray(bData)) realBranchCount = bData.length;
           }
 
           let realCommitCount = 0;
-          if (cRes.ok) {
+          if (cRes && cRes.ok) {
             const linkHeader = cRes.headers.get('link');
             if (linkHeader) {
               const match = linkHeader.match(/page=(\d+)>; rel="last"/);
@@ -271,16 +280,14 @@ export async function fetchBranchCommits(owner: string, repo: string, branchName
 export async function fetchCommitDetail(owner: string, repo: string, ref: string, token?: string | null): Promise<Commit | null> {
   try {
     const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (token && token.trim().length > 0) headers['Authorization'] = `Bearer ${token}`;
 
     const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${ref}`, { headers });
     if (res.ok) {
       const data: Commit = await res.json();
       return data;
     }
-  } catch (err) {
-    console.error(`Error fetching commit detail for ${ref}:`, err);
-  }
+  } catch {}
 
   return null;
 }
