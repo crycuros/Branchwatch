@@ -104,6 +104,37 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
             )}
           </div>
 
+          {/* Files to Stage field */}
+          {(selectedNode.type === 'stage' || selectedNode.type === 'working_tree') && (
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-medium text-neutral-500">
+                Target Files to Stage (comma separated or leave empty for all)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. src/app/page.tsx, README.md (or empty for all)"
+                value={selectedNode.config.selectedFiles?.join(', ') || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const files = val
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  onUpdateConfig(selectedNode.id, {
+                    selectedFiles: files.length > 0 ? files : undefined,
+                    filesChangedCount: files.length > 0 ? files.length : 1,
+                  });
+                }}
+                className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 font-mono text-xs"
+              />
+              <div className="text-[10px] text-neutral-400 font-mono">
+                {selectedNode.config.selectedFiles && selectedNode.config.selectedFiles.length > 0
+                  ? `Staging ${selectedNode.config.selectedFiles.length} specific file(s): git add ${selectedNode.config.selectedFiles.join(' ')}`
+                  : 'Staging all modified files: git add .'}
+              </div>
+            </div>
+          )}
+
           {/* Commit Message field */}
           {selectedNode.type === 'commit' && (
             <div className="space-y-1.5">
