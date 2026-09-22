@@ -82,6 +82,26 @@ function buildStepForNode(node: WorkflowNode): ExecutionStep | null {
       command = `git push ${node.config.remoteName || 'origin'} ${node.config.branchName || 'HEAD'}`;
       description = `Push local commits to remote`;
       break;
+    case 'plugin': {
+      let tpl = node.config.commandTemplate || 'git status';
+      const params = node.config.customParams || {};
+
+      // Handle {{#if key}}...{{/if}}
+      tpl = tpl.replace(/\{\{#if (\w+)\}\}(.*?)\{\{\/if\}\}/g, (_, key, inner) => {
+        return params[key] ? inner : '';
+      });
+
+      // Handle variables {{key}}
+      tpl = tpl.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+        if (key === 'branch' || key === 'branchName') return node.config.branchName || 'main';
+        if (params[key] !== undefined) return String(params[key]);
+        return '';
+      });
+
+      command = tpl.trim();
+      description = `Execute custom plugin: ${node.title}`;
+      break;
+    }
     default:
       return null;
   }

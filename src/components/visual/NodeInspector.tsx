@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { WorkflowNode } from '@/lib/workflowTypes';
 import { Commit } from '@/lib/types';
-import { GitCommit, ExternalLink, Trash2, X, Clock, Play, GitBranch, Upload, Download, FileCode, CheckCircle2 } from 'lucide-react';
+import {
+  GitCommit, ExternalLink, Trash2, X, Clock, Play, GitBranch, Upload,
+  Download, FileCode, CheckCircle2, ArrowUp, ArrowDown, Files, Search,
+  GitCompare, Shield,
+} from 'lucide-react';
 import { Button } from '../ui/Button';
 
 interface NodeInspectorProps {
@@ -23,6 +27,8 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
   onCloseInspector,
   onUpdateConfig,
 }) => {
+  const [branchFileSearch, setBranchFileSearch] = useState('');
+
   if (!selectedNode) {
     return (
       <div className="p-6 rounded-2xl border border-neutral-200/60 dark:border-neutral-800/60 bg-white/60 dark:bg-neutral-900/30 text-center text-xs text-neutral-400">
@@ -235,22 +241,132 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
             </div>
           )}
 
-          {/* Branch Name field */}
+          {/* Branch Name & Divergence Info */}
           {(selectedNode.type === 'branch' || selectedNode.type === 'push' || selectedNode.type === 'pull') && (
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-medium text-neutral-500">
-                Branch Name
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. main, feature/auth"
-                value={selectedNode.config.branchName || ''}
-                onChange={(e) => onUpdateConfig(selectedNode.id, { branchName: e.target.value })}
-                className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 font-mono text-xs"
-              />
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-medium text-neutral-500">
+                  Branch Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. main, feature/auth"
+                  value={selectedNode.config.branchName || ''}
+                  onChange={(e) => onUpdateConfig(selectedNode.id, { branchName: e.target.value })}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 font-mono text-xs"
+                />
+              </div>
+
+              {/* Branch Divergence (Ahead / Behind) */}
+              {selectedNode.type === 'branch' && (selectedNode.config.aheadBy !== undefined || selectedNode.config.behindBy !== undefined) && (
+                <div className="space-y-2 p-2.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-300">
+                      Sync vs {selectedNode.config.baseBranchName || 'main'}
+                    </span>
+                    {selectedNode.config.aheadBy === 0 && selectedNode.config.behindBy === 0 ? (
+                      <span className="text-neutral-500 font-mono text-[10px]">Up to date</span>
+                    ) : (
+                      <span className="text-[10px] font-mono text-neutral-400">Diverged</span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/50 dark:border-neutral-700/50 text-center">
+                      <div className="text-[10px] text-neutral-400 font-medium">Ahead</div>
+                      <div className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-0.5">
+                        <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
+                        {selectedNode.config.aheadBy ?? 0}
+                      </div>
+                      <div className="text-[9px] text-neutral-400">unmerged commits</div>
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/50 dark:border-neutral-700/50 text-center">
+                      <div className="text-[10px] text-neutral-400 font-medium">Behind</div>
+                      <div className="text-sm font-bold font-mono text-rose-600 dark:text-rose-400 flex items-center justify-center gap-0.5">
+                        <ArrowDown className="w-3.5 h-3.5 stroke-[2.5]" />
+                        {selectedNode.config.behindBy ?? 0}
+                      </div>
+                      <div className="text-[9px] text-neutral-400">commits behind</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Files Committed on this Branch */}
+              {selectedNode.type === 'branch' && selectedNode.config.branchFiles && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                      <Files className="w-3.5 h-3.5 text-neutral-400" />
+                      <span>Committed Files</span>
+                    </span>
+                    <span className="font-mono text-[10px] text-neutral-500">
+                      {selectedNode.config.branchFiles.length} file{selectedNode.config.branchFiles.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+
+                  {/* File Search */}
+                  {selectedNode.config.branchFiles.length > 5 && (
+                    <div className="relative">
+                      <Search className="w-3 h-3 absolute left-2.5 top-2 text-neutral-400" />
+                      <input
+                        type="text"
+                        placeholder="Search branch files..."
+                        value={branchFileSearch}
+                        onChange={(e) => setBranchFileSearch(e.target.value)}
+                        className="w-full pl-7 pr-2.5 py-1 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-[10px] font-mono text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400"
+                      />
+                    </div>
+                  )}
+
+                  {/* File List */}
+                  <div className="max-h-48 overflow-y-auto space-y-1 p-1.5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
+                    {selectedNode.config.branchFiles
+                      .filter((f) => !branchFileSearch || f.path.toLowerCase().includes(branchFileSearch.toLowerCase()))
+                      .map((f) => (
+                        <div
+                          key={f.path}
+                          className="p-1.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/60 flex items-center justify-between gap-2 text-[11px] font-mono"
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 truncate">
+                            <span
+                              className={`text-[9px] px-1 py-0.2 rounded font-bold uppercase flex-shrink-0 ${
+                                f.status === 'added'
+                                  ? 'bg-emerald-500/10 text-emerald-500'
+                                  : f.status === 'deleted'
+                                  ? 'bg-rose-500/10 text-rose-500'
+                                  : 'bg-neutral-500/10 text-neutral-400'
+                              }`}
+                            >
+                              {f.status.substring(0, 3)}
+                            </span>
+                            <span className="truncate text-neutral-800 dark:text-neutral-200" title={f.path}>
+                              {f.path}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] flex-shrink-0">
+                            {f.additions > 0 && (
+                              <span className="text-emerald-600 dark:text-emerald-400">+{f.additions}</span>
+                            )}
+                            {f.deletions > 0 && (
+                              <span className="text-rose-600 dark:text-rose-400">-{f.deletions}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    {selectedNode.config.branchFiles.length === 0 && (
+                      <div className="text-center py-3 text-[10px] text-neutral-400">
+                        No unique files committed in this branch compared to {selectedNode.config.baseBranchName || 'main'}.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
+          {/* Remote Name field */}
           {/* Remote Name field */}
           {(selectedNode.type === 'push' || selectedNode.type === 'pull') && (
             <div className="space-y-1.5">
@@ -267,12 +383,70 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
             </div>
           )}
 
+          {/* Plugin / Custom Node Parameters */}
+          {selectedNode.type === 'plugin' && (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                <span>Plugin Configuration</span>
+                {selectedNode.config.pluginName && (
+                  <span className="font-mono text-[10px] text-neutral-400">
+                    {selectedNode.config.pluginName}
+                  </span>
+                )}
+              </div>
+
+              {selectedNode.config.commandTemplate && (
+                <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 truncate">
+                  $ {selectedNode.config.commandTemplate}
+                </div>
+              )}
+
+              {selectedNode.config.customParams && Object.keys(selectedNode.config.customParams).length > 0 ? (
+                <div className="space-y-2">
+                  {Object.entries(selectedNode.config.customParams).map(([key, val]) => (
+                    <div key={key} className="space-y-1">
+                      <label className="block text-[11px] font-medium text-neutral-500 capitalize">
+                        {key.replace(/([A-Z])/g, ' $1')}
+                      </label>
+                      {typeof val === 'boolean' ? (
+                        <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={val}
+                            onChange={(e) => {
+                              const updated = { ...selectedNode.config.customParams, [key]: e.target.checked };
+                              onUpdateConfig(selectedNode.id, { customParams: updated });
+                            }}
+                            className="rounded border-neutral-300 dark:border-neutral-700 text-neutral-900 focus:ring-0"
+                          />
+                          <span>Enable {key}</span>
+                        </label>
+                      ) : (
+                        <input
+                          type="text"
+                          value={String(val)}
+                          onChange={(e) => {
+                            const updated = { ...selectedNode.config.customParams, [key]: e.target.value };
+                            onUpdateConfig(selectedNode.id, { customParams: updated });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 font-mono text-xs"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-neutral-400 py-1">No configurable parameters for this plugin.</div>
+              )}
+            </div>
+          )}
+
           {/* Direct Execute Trigger */}
           <div className="pt-1">
             <Button
               variant="primary"
               size="sm"
-              className="w-full"
+              className="w-full font-semibold"
               disabled={selectedNode.status === 'executing' || (selectedNode.type === 'commit' && !selectedNode.config.commitMessage?.trim())}
               onClick={() => onExecuteAction(selectedNode)}
             >
@@ -289,6 +463,8 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                 ? 'Push to Remote'
                 : selectedNode.type === 'pull'
                 ? 'Pull from Remote'
+                : selectedNode.type === 'plugin'
+                ? 'Execute Plugin Action'
                 : 'Run Status Check'}
             </Button>
           </div>

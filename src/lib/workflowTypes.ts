@@ -1,4 +1,4 @@
-export type NodeType = 'working_tree' | 'stage' | 'commit' | 'branch' | 'pull' | 'push';
+export type NodeType = 'working_tree' | 'stage' | 'commit' | 'branch' | 'pull' | 'push' | 'plugin';
 export type NodeStatusType = 'draft' | 'ready' | 'executing' | 'success' | 'failed';
 
 // Typed port system — each port has a semantic data type
@@ -44,6 +44,10 @@ export const NODE_PORT_DEFINITIONS: Record<
     input: { type: 'BranchRef', label: 'Branch Reference' },
     output: { type: 'RemoteRef', label: 'Remote Reference' },
   },
+  plugin: {
+    input: { type: 'BranchRef', label: 'Input Reference' },
+    output: { type: 'BranchRef', label: 'Output Reference' },
+  },
 };
 
 export interface ExecutionLogEntry {
@@ -69,6 +73,22 @@ export interface WorkflowNodeConfig {
   authorName?: string;
   authorAvatar?: string;
   commitUrl?: string;
+  aheadBy?: number;
+  behindBy?: number;
+  baseBranchName?: string;
+  branchFiles?: {
+    path: string;
+    status: 'added' | 'modified' | 'deleted' | 'renamed';
+    additions: number;
+    deletions: number;
+  }[];
+  pluginId?: string;
+  pluginName?: string;
+  pluginIcon?: string;
+  inputPortType?: PortDataType;
+  outputPortType?: PortDataType;
+  customParams?: Record<string, any>;
+  commandTemplate?: string;
   executionLog?: ExecutionLogEntry;
 }
 

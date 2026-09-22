@@ -42,15 +42,18 @@ export function validateConnection(
   }
 
   // Push/Terminal nodes have no output
-  if (fromDef.output.type === 'None') {
+  const fromOutputType = fromNode.config.outputPortType || fromDef.output.type;
+  const toInputType = toNode.config.inputPortType || toDef.input.type;
+
+  if (fromOutputType === 'None') {
     return {
       valid: false,
       reason: `${fromNode.title} is a terminal node and cannot have outgoing connections`,
     };
   }
 
-  // Working Tree accepts no input
-  if (toDef.input.type === 'None') {
+  // Nodes with no input accept nothing
+  if (toInputType === 'None') {
     return {
       valid: false,
       reason: `${toNode.title} does not accept incoming connections`,
@@ -59,18 +62,19 @@ export function validateConnection(
 
   // Allow compatible connections (e.g. CommitRef can directly connect to Push)
   const isCompatible =
-    fromDef.output.type === toDef.input.type ||
-    (fromNode.type === 'commit' && toNode.type === 'push');
+    fromOutputType === toInputType ||
+    (fromNode.type === 'commit' && toNode.type === 'push') ||
+    fromOutputType === 'WorkingTreeChanges' && toInputType === 'StagedChanges';
 
   if (!isCompatible) {
     return {
       valid: false,
-      reason: `❌ ${fromNode.title} outputs "${fromDef.output.label}" but ${toNode.title} requires "${toDef.input.label}"`,
-      portInfo: `Output: ${fromDef.output.type} → Input required: ${toDef.input.type}`,
+      reason: `❌ ${fromNode.title} outputs "${fromOutputType}" but ${toNode.title} requires "${toInputType}"`,
+      portInfo: `Output: ${fromOutputType} → Input required: ${toInputType}`,
     };
   }
 
-  return { valid: true, portInfo: `${fromDef.output.label} → ${toDef.input.label}` };
+  return { valid: true, portInfo: `${fromOutputType} → ${toInputType}` };
 }
 
 // Pre-execution workflow graph validator

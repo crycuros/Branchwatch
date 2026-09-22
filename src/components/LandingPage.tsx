@@ -90,6 +90,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     };
   }, []);
 
+  // Auto-cycle showcase tabs gently if user is near top
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (scrollY < 150) {
+        setActiveFeatureIndex((prev) => (prev + 1) % 3);
+      }
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [scrollY]);
+
   const handleTokenSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (tokenInput.trim()) {
@@ -144,35 +154,32 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section className="relative min-h-[90vh] max-w-6xl mx-auto px-6 pt-20 pb-16 flex flex-col items-center justify-center text-center">
         {/* Ambient Glow Depth Layer */}
         <div
-          className="absolute pointer-events-none w-[650px] h-[350px] bg-gradient-to-tr from-blue-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-[100px] -top-10 left-1/2 -translate-x-1/2 -z-10"
-          style={{ transform: `translate(-50%, ${scrollY * 0.15}px)` }}
+          className="absolute pointer-events-none w-[650px] h-[350px] bg-gradient-to-tr from-blue-500/15 via-purple-500/10 to-emerald-500/15 rounded-full blur-[100px] -top-10 left-1/2 -translate-x-1/2 -z-10 animate-pulse-glow"
         />
 
         {/* Floating Parallax Depth Badge Left */}
-        <div
-          className="hidden lg:flex absolute left-8 top-32 apple-glass-card rounded-2xl p-3.5 items-center gap-3 shadow-xl transition-transform duration-75 pointer-events-none"
-          style={{ transform: `translateY(${scrollY * -0.22}px) rotate(-3deg)` }}
-        >
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-          <div className="text-left font-mono">
-            <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">main · 0 uncommitted</div>
-            <div className="text-[10px] text-neutral-400">Clean working tree</div>
+        <div className="hidden lg:block absolute left-8 top-32 pointer-events-none animate-float-left">
+          <div className="apple-glass-card rounded-2xl p-3.5 flex items-center gap-3 shadow-xl">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div className="text-left font-mono">
+              <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">main · 0 uncommitted</div>
+              <div className="text-[10px] text-neutral-400">Clean working tree</div>
+            </div>
           </div>
         </div>
 
         {/* Floating Parallax Depth Badge Right */}
-        <div
-          className="hidden lg:flex absolute right-8 top-44 apple-glass-card rounded-2xl p-3.5 items-center gap-3 shadow-xl transition-transform duration-75 pointer-events-none"
-          style={{ transform: `translateY(${scrollY * -0.35}px) rotate(3deg)` }}
-        >
-          <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
-            <GitMerge className="w-4 h-4" />
-          </div>
-          <div className="text-left font-mono">
-            <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">+182 / -47 lines</div>
-            <div className="text-[10px] text-neutral-400">Auto diff synced</div>
+        <div className="hidden lg:block absolute right-8 top-44 pointer-events-none animate-float-right">
+          <div className="apple-glass-card rounded-2xl p-3.5 flex items-center gap-3 shadow-xl">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+              <GitMerge className="w-4 h-4" />
+            </div>
+            <div className="text-left font-mono">
+              <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">+182 / -47 lines</div>
+              <div className="text-[10px] text-neutral-400">Auto diff synced</div>
+            </div>
           </div>
         </div>
 
@@ -185,20 +192,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           }}
           className="max-w-4xl space-y-6"
         >
-          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-md text-xs font-medium text-neutral-700 dark:text-neutral-300">
+          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-md text-xs font-medium text-neutral-700 dark:text-neutral-300 animate-slide-up stagger-1">
             <span>Enterprise Git Topology & Real-Time Intelligence</span>
           </div>
 
-          <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-[1.08]">
+          <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-[1.08] animate-slide-up stagger-2">
             Understand every branch. <br />
             <span className="text-neutral-400 dark:text-neutral-500 font-medium">At a glance.</span>
           </h1>
 
-          <p className="text-lg sm:text-2xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto font-normal leading-relaxed">
+          <p className="text-lg sm:text-2xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto font-normal leading-relaxed animate-slide-up stagger-3">
             Monitor real-time repository commits, multi-branch topologies, live visual code diffs, and node-based git workflows in one centralized workspace.
           </p>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up stagger-4">
             {tokenConnected ? (
               <Button
                 variant="primary"

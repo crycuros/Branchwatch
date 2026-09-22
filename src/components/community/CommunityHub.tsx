@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { CommunityWorkflow, WorkflowCategory } from '@/lib/communityTypes';
 import { getCommunityWorkflows, toggleStarWorkflow } from '@/lib/communityStorage';
 import { WorkflowCard } from './WorkflowCard';
+import { PluginMarketplace } from '../plugins/PluginMarketplace';
 import {
   Search,
   Plus,
@@ -10,6 +11,8 @@ import {
   SlidersHorizontal,
   Star,
   Loader2,
+  Box,
+  Layers,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { checkUserStarredRepo, starRepositoryOnGitHub, unstarRepositoryOnGitHub } from '@/lib/github';
@@ -45,6 +48,7 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   onOpenPublishModal,
   onOpenDiscussions,
 }) => {
+  const [hubView, setHubView] = useState<'workflows' | 'plugins'>('workflows');
   const [workflows, setWorkflows] = useState<CommunityWorkflow[]>([]);
   const [starMap, setStarMap] = useState<StarMap>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -144,15 +148,41 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
               <Compass className="w-4 h-4" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-              Community Workflow Hub
+              Community Hub & Plugins
             </h1>
           </div>
           <p className="text-xs text-neutral-500 mt-1.5 leading-relaxed">
-            Discover, fork, and reuse proven Git workflows crafted by software engineers and teams.
+            Discover, fork, and reuse Git workflows and install custom community nodes for your visual canvas.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Hub View Switcher */}
+          <div className="flex items-center bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+            <button
+              onClick={() => setHubView('workflows')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
+                hubView === 'workflows'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm font-semibold'
+                  : 'hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Workflows</span>
+            </button>
+            <button
+              onClick={() => setHubView('plugins')}
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
+                hubView === 'plugins'
+                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm font-semibold'
+                  : 'hover:text-neutral-900 dark:hover:text-white'
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>Plugins & Nodes</span>
+            </button>
+          </div>
+
           {/* Star BranchWatch on GitHub */}
           <button
             onClick={handleGitHubStarToggle}
@@ -169,7 +199,7 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
             ) : (
               <Star className={`w-3.5 h-3.5 ${isGitHubStarred ? 'fill-current' : 'text-neutral-500'}`} />
             )}
-            <span>{isGitHubStarred ? 'Starred on GitHub' : 'Star on GitHub'}</span>
+            <span>{isGitHubStarred ? 'Starred' : 'Star'}</span>
             {githubStarCount !== null && (
               <span className={`text-[11px] px-1.5 py-0.5 rounded-md font-mono ${isGitHubStarred ? 'bg-white/20 dark:bg-black/10' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400'}`}>
                 {githubStarCount}
@@ -177,16 +207,23 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
             )}
           </button>
 
-          <Button variant="primary" size="sm" onClick={onOpenPublishModal}>
-            <Plus className="w-3.5 h-3.5" />
-            <span>Publish Workflow</span>
-          </Button>
+          {hubView === 'workflows' && (
+            <Button variant="primary" size="sm" onClick={onOpenPublishModal}>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Publish Workflow</span>
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Featured Section */}
-      {!searchQuery && selectedCategory === 'all' && featuredWorkflows.length > 0 && (
-        <div className="space-y-3">
+      {/* Conditionally Render Plugins Marketplace */}
+      {hubView === 'plugins' ? (
+        <PluginMarketplace />
+      ) : (
+        <>
+          {/* Featured Section */}
+          {!searchQuery && selectedCategory === 'all' && featuredWorkflows.length > 0 && (
+            <div className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">
             <Sparkles className="w-3.5 h-3.5 text-neutral-400" />
             <span>Featured Workflow Recipes</span>
@@ -303,6 +340,8 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 };

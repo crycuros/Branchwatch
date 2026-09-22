@@ -65,28 +65,66 @@ export async function fetchUserRepositories(token?: string | null): Promise<Repo
       return [];
     }
 
-    // Return repos immediately without individual per-repo API calls
-    // Branch/commit counts are fetched on-demand when a repo is selected
-    return repos.map((r) => ({
-      id: r.id,
-      name: r.name,
-      full_name: r.full_name,
-      owner: {
-        login: r.owner.login,
-        avatar_url: r.owner.avatar_url,
-      },
-      private: r.private ?? false,
-      description: r.description,
-      html_url: r.html_url,
-      default_branch: r.default_branch || 'main',
-      updated_at: r.updated_at,
-      stargazers_count: r.stargazers_count || 0,
-      forks_count: r.forks_count || 0,
-      open_issues_count: r.open_issues_count || 0,
-      branches_count: 0, // Loaded on repo select
-      commits_count: 0,  // Loaded on repo select
-      contributors_count: 1,
-    }));
+    // Return repos with real branch and commit counts fetched in parallel
+    const enrichedRepos = await Promise.all(
+      repos.map(async (r: any) => {
+        const baseRepo: Repository = {
+          id: r.id,
+          name: r.name,
+          full_name: r.full_name,
+          owner: {
+            login: r.owner.login,
+            avatar_url: r.owner.avatar_url,
+          },
+          private: r.private ?? false,
+          description: r.description,
+          html_url: r.html_url,
+          default_branch: r.default_branch || 'main',
+          updated_at: r.updated_at,
+          stargazers_count: r.stargazers_count || 0,
+          forks_count: r.forks_count || 0,
+          open_issues_count: r.open_issues_count || 0,
+          branches_count: 1,
+          commits_count: 0,
+          contributors_count: 1,
+        };
+
+        try {
+          const [bRes, cRes] = await Promise.all([
+            fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/branches?per_page=100`, { headers }),
+            fetch(`https://api.github.com/repos/${r.owner.login}/${r.name}/commits?per_page=1`, { headers }),
+          ]);
+
+          let realBranchCount = 1;
+          if (bRes.ok) {
+            const bData = await bRes.json();
+            if (Array.isArray(bData)) realBranchCount = bData.length;
+          }
+
+          let realCommitCount = 0;
+          if (cRes.ok) {
+            const linkHeader = cRes.headers.get('link');
+            if (linkHeader) {
+              const match = linkHeader.match(/page=(\d+)>; rel="last"/);
+              if (match) realCommitCount = parseInt(match[1], 10);
+            } else {
+              const cData = await cRes.json();
+              if (Array.isArray(cData)) realCommitCount = cData.length;
+            }
+          }
+
+          return {
+            ...baseRepo,
+            branches_count: realBranchCount,
+            commits_count: realCommitCount,
+          };
+        } catch {
+          return baseRepo;
+        }
+      })
+    );
+
+    return enrichedRepos;
   } catch (err) {
     console.error('Error fetching real user repositories:', err);
     return [];

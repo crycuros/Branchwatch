@@ -3,6 +3,8 @@ import { WorkflowNode, NodeStatusType, NODE_PORT_DEFINITIONS } from '@/lib/workf
 import {
   FolderGit2, FileCode, GitCommit, GitBranch, Download, Upload,
   CheckCircle2, Clock, AlertCircle, Loader2, Circle, ExternalLink,
+  ArrowUp, ArrowDown, Files, GitCompare, Archive, GitMerge, Tag,
+  GitPullRequest, Trash2, Settings2, Box,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -38,8 +40,20 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
     branch: GitBranch,
     pull: Download,
     push: Upload,
+    plugin: Box,
   };
-  const Icon = nodeIcons[node.type] || GitCommit;
+
+  const PLUGIN_ICON_MAP: Record<string, React.FC<{ className?: string }>> = {
+    Archive,
+    GitMerge,
+    Tag,
+    GitPullRequest,
+    Trash2,
+    Settings2,
+    Box,
+  };
+
+  const Icon = (node.config.pluginIcon && PLUGIN_ICON_MAP[node.config.pluginIcon]) || nodeIcons[node.type] || GitCommit;
   const portDef = NODE_PORT_DEFINITIONS[node.type];
 
   const statusBadge = (status: NodeStatusType) => {
@@ -127,10 +141,10 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
       {/* Port type strip */}
       <div className="flex justify-between items-center px-3.5 py-1 bg-neutral-50/60 dark:bg-neutral-800/30 border-b border-neutral-100 dark:border-neutral-800/50">
         <span className="text-[9px] font-mono text-neutral-400">
-          {portDef?.input.type === 'None' ? '⊘ no input' : `← ${portDef?.input.type}`}
+          {(node.config.inputPortType || portDef?.input.type) === 'None' ? '⊘ no input' : `← ${node.config.inputPortType || portDef?.input.type}`}
         </span>
         <span className="text-[9px] font-mono text-neutral-400">
-          {portDef?.output.type === 'None' ? '⊘ terminal' : `${portDef?.output.type} →`}
+          {(node.config.outputPortType || portDef?.output.type) === 'None' ? '⊘ terminal' : `${node.config.outputPortType || portDef?.output.type} →`}
         </span>
       </div>
 
@@ -260,25 +274,70 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
 
         {/* BRANCH */}
         {node.type === 'branch' && (
-          <div className="space-y-2">
-            <div
-              className={`font-mono font-semibold text-xs flex items-center gap-1.5 ${
-                node.status === 'success'
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-neutral-900 dark:text-neutral-100'
-              }`}
-            >
-              {node.status === 'success' && <CheckCircle2 className="w-3 h-3" />}
-              {node.config.branchName || 'main'}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div
+                className={`font-mono font-semibold text-xs flex items-center gap-1.5 truncate ${
+                  node.status === 'success'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-neutral-900 dark:text-neutral-100'
+                }`}
+              >
+                {node.status === 'success' && <CheckCircle2 className="w-3 h-3 flex-shrink-0" />}
+                <span className="truncate">{node.config.branchName || 'main'}</span>
+              </div>
+              {node.config.sha && (
+                <span className="text-[10px] font-mono text-neutral-400 flex-shrink-0">
+                  {node.config.sha}
+                </span>
+              )}
             </div>
-            {node.config.sha && (
-              <div className="text-[10px] font-mono text-neutral-500">HEAD: {node.config.sha}</div>
+
+            {/* Ahead / Behind & Divergence Tag */}
+            {(node.config.aheadBy !== undefined || node.config.behindBy !== undefined) && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {node.config.aheadBy === 0 && node.config.behindBy === 0 ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+                    In sync with {node.config.baseBranchName || 'main'}
+                  </span>
+                ) : (
+                  <>
+                    {(node.config.aheadBy ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        <ArrowUp className="w-3 h-3 stroke-[2.5]" />
+                        {node.config.aheadBy} ahead
+                      </span>
+                    )}
+                    {(node.config.behindBy ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                        <ArrowDown className="w-3 h-3 stroke-[2.5]" />
+                        {node.config.behindBy} behind
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
             )}
+
+            {/* Files Committed Counter */}
+            {node.config.branchFiles !== undefined && (
+              <div className="p-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200/60 dark:border-neutral-700/60 flex items-center justify-between text-[11px] font-mono">
+                <span className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-400">
+                  <Files className="w-3 h-3 text-neutral-400" />
+                  <span>{node.config.branchFiles.length} file{node.config.branchFiles.length === 1 ? '' : 's'} committed</span>
+                </span>
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <span className="text-emerald-600 dark:text-emerald-400">+{node.config.additions || 0}</span>
+                  <span className="text-rose-600 dark:text-rose-400">-{node.config.deletions || 0}</span>
+                </div>
+              </div>
+            )}
+
             {node.status !== 'success' && (
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full"
+                className="w-full text-xs font-medium"
                 onClick={(e) => { e.stopPropagation(); onExecuteAction(node); }}
               >
                 Switch to Branch
@@ -323,6 +382,35 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
                 onClick={(e) => { e.stopPropagation(); onExecuteAction(node); }}
               >
                 Push to Remote
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* PLUGIN / CUSTOM NODE */}
+        {node.type === 'plugin' && (
+          <div className="space-y-2">
+            <div className="text-neutral-500 font-mono text-[10px] p-2 rounded-lg bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/60 dark:border-neutral-800 truncate">
+              {node.config.commandTemplate ? `$ ${node.config.commandTemplate}` : 'Custom Plugin Action'}
+            </div>
+            {node.config.customParams && Object.keys(node.config.customParams).length > 0 && (
+              <div className="space-y-1 p-2 rounded-lg bg-neutral-50/50 dark:bg-neutral-800/40 border border-neutral-200/40 dark:border-neutral-700/40">
+                {Object.entries(node.config.customParams).slice(0, 3).map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between text-[10px] font-mono">
+                    <span className="text-neutral-400">{k}:</span>
+                    <span className="text-neutral-800 dark:text-neutral-200 truncate max-w-[120px] font-semibold">{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {node.status !== 'success' && node.status !== 'executing' && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full text-xs"
+                onClick={(e) => { e.stopPropagation(); onExecuteAction(node); }}
+              >
+                Execute Plugin
               </Button>
             )}
           </div>

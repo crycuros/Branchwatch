@@ -185,12 +185,24 @@ export default function Home() {
       setBranches(repoBranches);
 
       const defaultBranchObj = repoBranches.find((b) => b.name === repo.default_branch) || repoBranches[0];
+      let loadedCommits: Commit[] = [];
       if (defaultBranchObj) {
-        const branchCommits = await fetchBranchCommits(repo.owner.login, repo.name, defaultBranchObj.name, currentTok);
-        setCommits(branchCommits);
+        loadedCommits = await fetchBranchCommits(repo.owner.login, repo.name, defaultBranchObj.name, currentTok);
+        setCommits(loadedCommits);
       } else {
         setCommits([]);
       }
+
+      // Update repo object with live branches and commits counts
+      const updatedRepo: Repository = {
+        ...repo,
+        branches_count: repoBranches.length,
+        commits_count: loadedCommits.length,
+      };
+      setCurrentRepo(updatedRepo);
+      setRepositories((prev) =>
+        prev.map((r) => (r.id === repo.id || r.full_name === repo.full_name ? { ...r, branches_count: repoBranches.length, commits_count: loadedCommits.length } : r))
+      );
 
       const recentActs = await fetchRecentActivities(repo.owner.login, repo.name, currentTok);
       setActivities(recentActs);

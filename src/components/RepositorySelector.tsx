@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 import { Repository } from '@/lib/types';
-import { Search, FolderGit2, GitBranch, GitCommit, ExternalLink, Plus } from 'lucide-react';
+import { Search, FolderGit2, GitBranch, GitCommit, ExternalLink, Plus, Clock, Star, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/Button';
+
+const formatRelativeTime = (dateStr?: string) => {
+  if (!dateStr) return 'Recently';
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 60) return `${Math.max(1, diffMins)}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
 
 interface RepositorySelectorProps {
   repositories: Repository[];
@@ -214,15 +227,34 @@ export const RepositorySelector: React.FC<RepositorySelectorProps> = ({
                 )}
               </div>
 
-              <div className={`flex items-center gap-4 text-xs font-medium mt-4 pt-3 border-t ${isSelected ? 'border-neutral-800 dark:border-neutral-200 text-neutral-200 dark:text-neutral-700' : 'border-neutral-100 dark:border-neutral-800/60 text-neutral-500 dark:text-neutral-400'}`}>
-                <div className="flex items-center gap-1.5">
-                  <GitBranch className="w-3.5 h-3.5" />
-                  <span>{repo.branches_count ?? 0} {repo.branches_count === 1 ? 'branch' : 'branches'}</span>
+              <div className={`flex items-center justify-between text-xs font-medium mt-4 pt-3 border-t ${isSelected ? 'border-neutral-800 dark:border-neutral-200 text-neutral-200 dark:text-neutral-700' : 'border-neutral-100 dark:border-neutral-800/60 text-neutral-500 dark:text-neutral-400'}`}>
+                <div className="flex items-center gap-2.5 font-mono text-[11px]">
+                  <div className="flex items-center gap-1.5" title="Total Branches">
+                    <GitBranch className="w-3.5 h-3.5 flex-shrink-0 text-neutral-400" />
+                    <span>{repo.branches_count ?? 1} {repo.branches_count === 1 ? 'branch' : 'branches'}</span>
+                  </div>
+
+                  <span className="opacity-40">·</span>
+
+                  <div className="flex items-center gap-1" title="Total Commits">
+                    <GitCommit className="w-3.5 h-3.5 flex-shrink-0 text-neutral-400" />
+                    <span>{repo.commits_count ?? 0} {repo.commits_count === 1 ? 'commit' : 'commits'}</span>
+                  </div>
+
+                  {repo.stargazers_count > 0 && (
+                    <>
+                      <span className="opacity-40">·</span>
+                      <div className="flex items-center gap-1" title="Stars">
+                        <Star className="w-3 h-3 flex-shrink-0 text-amber-500 fill-amber-500/20" />
+                        <span>{repo.stargazers_count}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
-                <span>·</span>
-                <div className="flex items-center gap-1.5">
-                  <GitCommit className="w-3.5 h-3.5" />
-                  <span>{repo.commits_count ?? 0} {repo.commits_count === 1 ? 'commit' : 'commits'}</span>
+
+                <div className="flex items-center gap-1 text-[10px] text-neutral-400 font-mono">
+                  <Clock className="w-3 h-3 flex-shrink-0" />
+                  <span>{formatRelativeTime(repo.updated_at)}</span>
                 </div>
               </div>
             </div>

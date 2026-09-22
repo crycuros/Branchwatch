@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { WorkflowNode, NodeConnection, NodeType, ExecutionStep, WorkflowValidationIssue } from '@/lib/workflowTypes';
 import { generateGitCommands, buildNodesFromRepoData } from '@/lib/workflowGenerator';
-import { validateWorkflowGraph } from '@/lib/nodeValidation';
+import { validateWorkflowGraph, validateConnection } from '@/lib/nodeValidation';
 import { generateExecutionPlan, executeStep } from '@/lib/workflowExecutor';
 import { executeWorkflowViaGitHub, ExecutionResult } from '@/lib/githubExecutor';
 import { LocalGitStatus } from '@/app/api/git/local-status/route';
@@ -13,12 +13,17 @@ import { NodeInspector } from './NodeInspector';
 import { NodeContextMenu } from './NodeContextMenu';
 import { WorkflowPublishModal } from '../community/WorkflowPublishModal';
 
+import { PluginNodeDefinition } from '@/lib/pluginTypes';
+import { getInstalledPlugins } from '@/lib/pluginStorage';
+import { PluginEditorModal } from '../plugins/PluginEditorModal';
+
 import {
   Plus, Minus, RotateCcw, Save, Undo, Redo,
   FolderGit2, FileCode, GitCommit, GitBranch, Download, Upload,
   Layers, Maximize2, Minimize2, Terminal as TerminalIcon, X,
   GitBranch as LogoIcon, Info, Play, CheckCircle2, AlertTriangle, XCircle, RefreshCw,
   Globe, BookOpen, Edit3, GitFork, ArrowRight, ArrowLeft, ExternalLink, Sparkles,
+  Archive, GitMerge, Tag, GitPullRequest, Trash2, Settings2, Box,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -87,6 +92,18 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [forkMeta, setForkMeta] = useState(initialWorkflow?.forkedFrom || null);
 
+  // Plugin Studio & Extensible Nodes
+  const [installedPlugins, setInstalledPlugins] = useState<PluginNodeDefinition[]>([]);
+  const [isPluginStudioOpen, setIsPluginStudioOpen] = useState(false);
+
+  const reloadPlugins = useCallback(() => {
+    setInstalledPlugins(getInstalledPlugins());
+  }, []);
+
+  useEffect(() => {
+    reloadPlugins();
+  }, [reloadPlugins]);
+
   // Workflow Execution State
   const [runMode, setRunMode] = useState<WorkflowRunMode>('idle');
   const [executionPlan, setExecutionPlan] = useState<ExecutionStep[]>([]);
@@ -120,7 +137,42 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
         );
       }
     } catch {}
-  }, []);
+
+    // Also sync ahead/behind and committed files for all branch nodes
+    try {
+      setNodes((prev) => {
+        const branchNodes = prev.filter((n) => n.type === 'branch');
+        branchNodes.forEach(async (bn) => {
+          const bName = bn.config.branchName || currentBranchName || 'main';
+          try {
+            const bRes = await fetch(`/api/git/branch-info?branch=${encodeURIComponent(bName)}&base=main`);
+            if (bRes.ok) {
+              const bData = await bRes.json();
+              setNodes((currentNodes) =>
+                currentNodes.map((n) =>
+                  n.id === bn.id
+                    ? {
+                        ...n,
+                        config: {
+                          ...n.config,
+                          aheadBy: bData.ahead,
+                          behindBy: bData.behind,
+                          baseBranchName: bData.baseBranch,
+                          branchFiles: bData.files,
+                          additions: bData.totalAdditions,
+                          deletions: bData.totalDeletions,
+                        },
+                      }
+                    : n
+                )
+              );
+            }
+          } catch {}
+        });
+        return prev;
+      });
+    } catch {}
+  }, [currentBranchName]);
 
   useEffect(() => {
     refreshLocalGitStatus();
@@ -223,7 +275,7 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
     }
   }, [history, historyIndex]);
 
-  const handleAddNode = (type: NodeType) => {
+  const handleAddNode = (type: NodeType, pluginDef?: PluginNodeDefinition) => {
     const titles: Record<NodeType, string> = {
       working_tree: 'Working Tree',
       stage: 'Stage',
@@ -231,13 +283,21 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
       branch: 'Branch',
       pull: 'Pull',
       push: 'Push',
+      plugin: pluginDef?.name || 'Custom Node',
     };
 
     const newId = `node-${Date.now()}`;
+    const initialCustomParams: Record<string, any> = {};
+    if (pluginDef?.configSchema) {
+      pluginDef.configSchema.forEach((f) => {
+        if (f.defaultValue !== undefined) initialCustomParams[f.key] = f.defaultValue;
+      });
+    }
+
     const newNode: WorkflowNode = {
       id: newId,
       type,
-      title: titles[type],
+      title: titles[type] || pluginDef?.name || 'Custom Node',
       x: 200 + nodes.length * 30,
       y: 180 + (nodes.length % 3) * 40,
       status: 'draft',
@@ -246,6 +306,13 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
         branchName: type === 'branch' || type === 'push' || type === 'pull'
           ? currentBranchName
           : undefined,
+        pluginId: pluginDef?.id,
+        pluginName: pluginDef?.name,
+        pluginIcon: pluginDef?.iconName,
+        commandTemplate: pluginDef?.commandTemplate,
+        inputPortType: pluginDef?.inputPort.type,
+        outputPortType: pluginDef?.outputPort.type,
+        customParams: Object.keys(initialCustomParams).length > 0 ? initialCustomParams : undefined,
       },
     };
 
@@ -268,6 +335,16 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
     if (fromId === toId) return;
     const exists = connections.some((c) => c.fromId === fromId && c.toId === toId);
     if (exists) return;
+
+    const fromNode = nodes.find((n) => n.id === fromId);
+    const toNode = nodes.find((n) => n.id === toId);
+    if (!fromNode || !toNode) return;
+
+    const validation = validateConnection(fromNode, toNode, connections);
+    if (!validation.valid) {
+      return;
+    }
+
     const newConn: NodeConnection = { id: `conn-${Date.now()}`, fromId, toId };
     const updated = [...connections, newConn];
     setConnections(updated);
@@ -661,7 +738,12 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
                 <span className="font-bold text-xs uppercase tracking-wider text-neutral-400">Node Library</span>
                 <button onClick={() => setShowLibrary(false)} className="text-neutral-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
               </div>
-              <NodeLibraryList onAddNode={handleAddNode} dark />
+              <NodeLibraryList
+                onAddNode={handleAddNode}
+                plugins={installedPlugins}
+                onOpenPluginStudio={() => setIsPluginStudioOpen(true)}
+                dark
+              />
             </div>
           )}
 
@@ -957,7 +1039,11 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
                 <span className="font-bold text-xs uppercase tracking-wider text-neutral-400">Node Library</span>
                 <Layers className="w-3.5 h-3.5 text-neutral-400" />
               </div>
-              <NodeLibraryList onAddNode={handleAddNode} />
+              <NodeLibraryList
+                onAddNode={handleAddNode}
+                plugins={installedPlugins}
+                onOpenPluginStudio={() => setIsPluginStudioOpen(true)}
+              />
             </div>
 
             {/* Canvas */}
@@ -1131,6 +1217,15 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
         onAddNode={handleAddNode}
         onResetView={() => setZoomScale(1)}
       />
+
+      {/* Plugin Studio Modal */}
+      {isPluginStudioOpen && (
+        <PluginEditorModal
+          isOpen={isPluginStudioOpen}
+          onClose={() => setIsPluginStudioOpen(false)}
+          onPluginSaved={() => reloadPlugins()}
+        />
+      )}
     </div>
   );
 };
@@ -1145,21 +1240,95 @@ const NODE_LIBRARY_ITEMS: { type: NodeType; label: string; Icon: React.FC<{ clas
   { type: 'push', label: 'Push', Icon: Upload },
 ];
 
-const NodeLibraryList: React.FC<{ onAddNode: (type: NodeType) => void; dark?: boolean }> = ({ onAddNode, dark }) => (
-  <div className="space-y-1.5 text-xs">
-    {NODE_LIBRARY_ITEMS.map(({ type, label, Icon }) => (
+const PLUGIN_ICONS: Record<string, React.FC<{ className?: string }>> = {
+  Archive,
+  GitMerge,
+  Tag,
+  GitPullRequest,
+  Trash2,
+  Settings2,
+  Box,
+};
+
+interface NodeLibraryListProps {
+  onAddNode: (type: NodeType, pluginDef?: PluginNodeDefinition) => void;
+  plugins: PluginNodeDefinition[];
+  onOpenPluginStudio: () => void;
+  dark?: boolean;
+}
+
+const NodeLibraryList: React.FC<NodeLibraryListProps> = ({
+  onAddNode,
+  plugins = [],
+  onOpenPluginStudio,
+  dark,
+}) => (
+  <div className="space-y-4 text-xs">
+    {/* Core Git Nodes */}
+    <div className="space-y-1.5">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-1">
+        Core Git
+      </div>
+      {NODE_LIBRARY_ITEMS.map(({ type, label, Icon }) => (
+        <button
+          key={type}
+          onClick={() => onAddNode(type)}
+          className={`w-full flex items-center gap-2.5 p-2 rounded-xl border transition-colors font-medium ${
+            dark
+              ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
+              : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
+          }`}
+        >
+          <Icon className={`w-3.5 h-3.5 ${dark ? 'text-neutral-400' : 'text-neutral-500'}`} />
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+
+    {/* Community Plugins */}
+    {plugins.length > 0 && (
+      <div className="space-y-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+            Community Nodes
+          </span>
+          <span className="text-[9px] font-mono text-neutral-500">{plugins.length}</span>
+        </div>
+
+        {plugins.map((plugin) => {
+          const Icon = PLUGIN_ICONS[plugin.iconName] || Box;
+          return (
+            <button
+              key={plugin.id}
+              onClick={() => onAddNode('plugin', plugin)}
+              className={`w-full flex items-center justify-between p-2 rounded-xl border transition-colors font-medium ${
+                dark
+                  ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
+                  : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${dark ? 'text-sky-400' : 'text-sky-500'}`} />
+                <span className="truncate">{plugin.name}</span>
+              </div>
+              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                ext
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    )}
+
+    {/* Custom Node Studio Shortcut */}
+    <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800">
       <button
-        key={type}
-        onClick={() => onAddNode(type)}
-        className={`w-full flex items-center gap-2.5 p-2.5 rounded-xl border transition-colors font-medium ${
-          dark
-            ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
-            : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
-        }`}
+        onClick={onOpenPluginStudio}
+        className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs transition-opacity hover:opacity-90 shadow-sm"
       >
-        <Icon className={`w-4 h-4 ${dark ? 'text-neutral-400' : 'text-neutral-500'}`} />
-        <span>{label}</span>
+        <Sparkles className="w-3.5 h-3.5" />
+        <span>+ Custom Node</span>
       </button>
-    ))}
+    </div>
   </div>
 );
