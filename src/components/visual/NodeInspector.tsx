@@ -7,6 +7,7 @@ import { Button } from '../ui/Button';
 interface NodeInspectorProps {
   selectedNode: WorkflowNode | null;
   commits: Commit[];
+  localFiles?: { path: string; status: string; additions?: number; deletions?: number }[];
   onDeleteNode: (id: string) => void;
   onExecuteAction: (node: WorkflowNode) => void;
   onCloseInspector?: () => void;
@@ -16,6 +17,7 @@ interface NodeInspectorProps {
 export const NodeInspector: React.FC<NodeInspectorProps> = ({
   selectedNode,
   commits,
+  localFiles = [],
   onDeleteNode,
   onExecuteAction,
   onCloseInspector,
@@ -106,30 +108,112 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
 
           {/* Files to Stage field */}
           {(selectedNode.type === 'stage' || selectedNode.type === 'working_tree') && (
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-medium text-neutral-500">
-                Target Files to Stage (comma separated or leave empty for all)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. src/app/page.tsx, README.md (or empty for all)"
-                value={selectedNode.config.selectedFiles?.join(', ') || ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const files = val
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                  onUpdateConfig(selectedNode.id, {
-                    selectedFiles: files.length > 0 ? files : undefined,
-                    filesChangedCount: files.length > 0 ? files.length : 1,
-                  });
-                }}
-                className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 font-mono text-xs"
-              />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-medium text-neutral-500">
+                  Target Files to Stage
+                </label>
+                {localFiles.length > 0 && (
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateConfig(selectedNode.id, {
+                          selectedFiles: localFiles.map((f) => f.path),
+                          filesChangedCount: localFiles.length,
+                        })
+                      }
+                      className="text-neutral-900 dark:text-neutral-100 hover:underline font-medium"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-neutral-400">·</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateConfig(selectedNode.id, {
+                          selectedFiles: [],
+                          filesChangedCount: 0,
+                        })
+                      }
+                      className="text-neutral-500 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {localFiles.length > 0 ? (
+                <div className="space-y-1 max-h-48 overflow-y-auto p-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700">
+                  {localFiles.map((file) => {
+                    const isSelected =
+                      selectedNode.config.selectedFiles?.includes(file.path) ?? false;
+                    return (
+                      <label
+                        key={file.path}
+                        className="flex items-center justify-between gap-2 p-1.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/60 cursor-pointer text-[11px] font-mono select-none"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              const prev = selectedNode.config.selectedFiles || [];
+                              const next = e.target.checked
+                                ? [...prev, file.path]
+                                : prev.filter((p) => p !== file.path);
+                              onUpdateConfig(selectedNode.id, {
+                                selectedFiles: next,
+                                filesChangedCount: next.length,
+                              });
+                            }}
+                            className="rounded border-neutral-300 dark:border-neutral-700 text-neutral-900 focus:ring-0"
+                          />
+                          <span className="truncate text-neutral-800 dark:text-neutral-200">
+                            {file.path}
+                          </span>
+                        </div>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase flex-shrink-0 ${
+                            file.status === 'added'
+                              ? 'bg-emerald-500/10 text-emerald-500'
+                              : file.status === 'deleted'
+                              ? 'bg-rose-500/10 text-rose-500'
+                              : file.status === 'untracked'
+                              ? 'bg-neutral-500/10 text-neutral-400'
+                              : 'bg-amber-500/10 text-amber-500'
+                          }`}
+                        >
+                          {file.status}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  placeholder="e.g. src/app/page.tsx, README.md (or empty for all)"
+                  value={selectedNode.config.selectedFiles?.join(', ') || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const files = val
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    onUpdateConfig(selectedNode.id, {
+                      selectedFiles: files.length > 0 ? files : undefined,
+                      filesChangedCount: files.length > 0 ? files.length : 1,
+                    });
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 font-mono text-xs"
+                />
+              )}
+
               <div className="text-[10px] text-neutral-400 font-mono">
                 {selectedNode.config.selectedFiles && selectedNode.config.selectedFiles.length > 0
-                  ? `Staging ${selectedNode.config.selectedFiles.length} specific file(s): git add ${selectedNode.config.selectedFiles.join(' ')}`
+                  ? `Staging ${selectedNode.config.selectedFiles.length} file(s): git add ${selectedNode.config.selectedFiles.join(' ')}`
                   : 'Staging all modified files: git add .'}
               </div>
             </div>

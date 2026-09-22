@@ -4,6 +4,7 @@ import { generateGitCommands, buildNodesFromRepoData } from '@/lib/workflowGener
 import { validateWorkflowGraph } from '@/lib/nodeValidation';
 import { generateExecutionPlan, executeStep } from '@/lib/workflowExecutor';
 import { executeWorkflowViaGitHub, ExecutionResult } from '@/lib/githubExecutor';
+import { LocalGitStatus } from '@/app/api/git/local-status/route';
 import { Commit, Branch } from '@/lib/types';
 import { CommunityWorkflow } from '@/lib/communityTypes';
 import { NodeCanvas } from './NodeCanvas';
@@ -93,6 +94,37 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
   const [validationIssues, setValidationIssues] = useState<WorkflowValidationIssue[]>([]);
   const [showValidation, setShowValidation] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
+  const [localGitStatus, setLocalGitStatus] = useState<LocalGitStatus | null>(null);
+
+  const refreshLocalGitStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/git/local-status');
+      if (res.ok) {
+        const data: LocalGitStatus = await res.json();
+        setLocalGitStatus(data);
+        setNodes((prev) =>
+          prev.map((n) =>
+            n.type === 'working_tree'
+              ? {
+                  ...n,
+                  status: 'ready',
+                  config: {
+                    ...n.config,
+                    filesChangedCount: data.totalFiles,
+                    additions: data.totalAdditions,
+                    deletions: data.totalDeletions,
+                  },
+                }
+              : n
+          )
+        );
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    refreshLocalGitStatus();
+  }, [refreshLocalGitStatus]);
 
   // Panel Toggles
   const [showLibrary, setShowLibrary] = useState(true);
@@ -964,6 +996,7 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
             <NodeInspector
               selectedNode={selectedNode}
               commits={commits}
+              localFiles={localGitStatus?.files || []}
               onDeleteNode={handleDeleteNode}
               onExecuteAction={handleExecuteAction}
               onUpdateConfig={handleUpdateConfig}
