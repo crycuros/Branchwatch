@@ -6,6 +6,12 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+const OFFICIAL_AUTHOR = {
+  authorLogin: 'branchwatch',
+  authorName: 'BranchWatch',
+  authorAvatar: 'https://avatars.githubusercontent.com/u/9919?s=200&v=4',
+};
+
 const TEMPLATES = [
   {
     id: 'template-feature-branch',
@@ -15,12 +21,10 @@ const TEMPLATES = [
     visibility: 'public',
     tags: JSON.stringify(['git-flow', 'feature-branch', 'best-practices', 'github']),
     isFeatured: true,
-    authorLogin: 'branchwatch',
-    authorName: 'BranchWatch Team',
-    authorAvatar: 'https://avatars.githubusercontent.com/u/9919?s=200&v=4',
-    starsCount: 384,
-    forksCount: 142,
-    usageCount: 2450,
+    ...OFFICIAL_AUTHOR,
+    starsCount: 0,
+    forksCount: 0,
+    usageCount: 0,
     nodes: JSON.stringify([
       { id: 'node-wt', type: 'working_tree', title: 'Working Tree', x: 60, y: 180, status: 'ready', config: { filesChangedCount: 3, additions: 84, deletions: 12 } },
       { id: 'node-stage', type: 'stage', title: 'Stage', x: 340, y: 180, status: 'draft', config: { selectedFiles: ['src/components/Canvas.tsx', 'src/lib/types.ts'] } },
@@ -43,12 +47,10 @@ const TEMPLATES = [
     visibility: 'public',
     tags: JSON.stringify(['hotfix', 'emergency', 'production', 'patch']),
     isFeatured: true,
-    authorLogin: 'alex_dev',
-    authorName: 'Alex Rivera',
-    authorAvatar: 'https://avatars.githubusercontent.com/u/1024025?v=4',
-    starsCount: 275,
-    forksCount: 96,
-    usageCount: 1820,
+    ...OFFICIAL_AUTHOR,
+    starsCount: 0,
+    forksCount: 0,
+    usageCount: 0,
     nodes: JSON.stringify([
       { id: 'node-branch', type: 'branch', title: 'Hotfix Branch', x: 60, y: 180, status: 'ready', config: { branchName: 'hotfix/cookie-patch' } },
       { id: 'node-wt', type: 'working_tree', title: 'Working Tree', x: 340, y: 180, status: 'ready', config: { filesChangedCount: 1, additions: 4, deletions: 2 } },
@@ -71,12 +73,10 @@ const TEMPLATES = [
     visibility: 'public',
     tags: JSON.stringify(['opensource', 'fork', 'pull-request', 'github']),
     isFeatured: false,
-    authorLogin: 'sarah_codes',
-    authorName: 'Sarah Chen',
-    authorAvatar: 'https://avatars.githubusercontent.com/u/59203?v=4',
-    starsCount: 198,
-    forksCount: 68,
-    usageCount: 1120,
+    ...OFFICIAL_AUTHOR,
+    starsCount: 0,
+    forksCount: 0,
+    usageCount: 0,
     nodes: JSON.stringify([
       { id: 'node-pull', type: 'pull', title: 'Sync Upstream', x: 60, y: 180, status: 'ready', config: { remoteName: 'upstream', branchName: 'main' } },
       { id: 'node-branch', type: 'branch', title: 'Topic Branch', x: 340, y: 180, status: 'draft', config: { branchName: 'contrib/theme-tokens' } },
@@ -99,12 +99,10 @@ const TEMPLATES = [
     visibility: 'public',
     tags: JSON.stringify(['monorepo', 'pnpm', 'turborepo', 'release']),
     isFeatured: false,
-    authorLogin: 'david_k',
-    authorName: 'David Kim',
-    authorAvatar: 'https://avatars.githubusercontent.com/u/148201?v=4',
-    starsCount: 165,
-    forksCount: 44,
-    usageCount: 890,
+    ...OFFICIAL_AUTHOR,
+    starsCount: 0,
+    forksCount: 0,
+    usageCount: 0,
     nodes: JSON.stringify([
       { id: 'node-wt', type: 'working_tree', title: 'Working Tree', x: 60, y: 180, status: 'ready', config: { filesChangedCount: 4, additions: 62, deletions: 8 } },
       { id: 'node-stage', type: 'stage', title: 'Stage Package', x: 340, y: 180, status: 'draft', config: { selectedFiles: ['packages/ui/package.json', 'packages/ui/src/index.ts'] } },
@@ -125,12 +123,10 @@ const TEMPLATES = [
     visibility: 'public',
     tags: JSON.stringify(['rebase', 'linear-history', 'sync', 'git-basics']),
     isFeatured: false,
-    authorLogin: 'elena_v',
-    authorName: 'Elena Vance',
-    authorAvatar: 'https://avatars.githubusercontent.com/u/84291?v=4',
-    starsCount: 142,
-    forksCount: 52,
-    usageCount: 930,
+    ...OFFICIAL_AUTHOR,
+    starsCount: 0,
+    forksCount: 0,
+    usageCount: 0,
     nodes: JSON.stringify([
       { id: 'node-pull', type: 'pull', title: 'Fetch Remote', x: 60, y: 180, status: 'ready', config: { remoteName: 'origin', branchName: 'main' } },
       { id: 'node-branch', type: 'branch', title: 'Feature Branch', x: 340, y: 180, status: 'draft', config: { branchName: 'feature/auth-guard' } },
@@ -144,7 +140,7 @@ const TEMPLATES = [
 ];
 
 async function main() {
-  console.log('Seeding BranchWatch community templates...');
+  console.log('Seeding BranchWatch official templates (0 stars, author: BranchWatch)...');
 
   for (const template of TEMPLATES) {
     await prisma.communityWorkflow.upsert({
@@ -152,10 +148,10 @@ async function main() {
       update: template,
       create: template,
     });
-    console.log(`  Seeded: ${template.title}`);
+    console.log(`  Updated: ${template.title}`);
   }
 
-  console.log(`Done. Seeded ${TEMPLATES.length} official templates.`);
+  console.log(`Done. Seeded ${TEMPLATES.length} official BranchWatch templates.`);
 }
 
 main()
