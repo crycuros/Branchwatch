@@ -1,8 +1,28 @@
 import React from 'react';
-import { LayoutGrid, FolderGit2, Activity, GitCompare, Workflow, GitMerge, Github, Compass } from 'lucide-react';
+import {
+  LayoutGrid,
+  FolderGit2,
+  Activity,
+  GitCompare,
+  Workflow,
+  GitMerge,
+  Github,
+  Compass,
+  Code2,
+  BookOpen,
+} from 'lucide-react';
 import { Repository, GitHubUser } from '@/lib/types';
 
-export type NavTab = 'overview' | 'graph' | 'visual' | 'community' | 'repositories' | 'activity' | 'compare';
+export type NavTab =
+  | 'overview'
+  | 'graph'
+  | 'visual'
+  | 'community'
+  | 'developer'
+  | 'docs'
+  | 'repositories'
+  | 'activity'
+  | 'compare';
 
 interface AppShellProps {
   activeTab: NavTab;
@@ -23,7 +43,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   onConnectTokenClick,
   authUser,
 }) => {
-  const navItems = [
+  const mainNavItems = [
     { id: 'overview' as NavTab, label: 'Overview', icon: LayoutGrid },
     { id: 'graph' as NavTab, label: 'Git Graph', icon: GitMerge },
     { id: 'visual' as NavTab, label: 'Visual Workflow', icon: Workflow },
@@ -33,32 +53,85 @@ export const AppShell: React.FC<AppShellProps> = ({
     { id: 'compare' as NavTab, label: 'Compare', icon: GitCompare },
   ];
 
+  const devNavItems = [
+    { id: 'developer' as NavTab, label: 'Dev Studio', icon: Code2, badge: 'Dev' },
+    { id: 'docs' as NavTab, label: 'Documentation', icon: BookOpen },
+  ];
+
   return (
     <div className="flex-1 h-full w-full min-h-0 min-w-0 bg-neutral-100/50 dark:bg-[#09090b] text-neutral-900 dark:text-neutral-100 flex flex-col md:flex-row font-sans transition-colors duration-200 overflow-hidden">
-      {/* Sidebar Navigation with Frosted Glass */}
-      <aside className="w-full md:w-60 h-auto md:h-full border-b md:border-b-0 md:border-r border-black/[0.06] dark:border-white/[0.06] bg-white/45 dark:bg-neutral-950/40 backdrop-blur-xl p-3 md:p-4 flex md:flex-col justify-between flex-shrink-0 overflow-y-auto z-10">
-        <div className="w-full">
-          {/* Active Navigation List */}
+      {/* Sidebar Navigation */}
+      <aside className="w-full md:w-60 h-auto md:h-full border-b md:border-b-0 md:border-r border-black/[0.06] dark:border-white/[0.06] bg-white/45 dark:bg-neutral-950/40 backdrop-blur-xl p-3 md:p-4 flex md:flex-col justify-between flex-shrink-0 overflow-y-auto z-10 no-scrollbar">
+        <div className="w-full space-y-4">
+          {/* Main Navigation */}
           <nav className="flex md:flex-col gap-1 w-full overflow-x-auto md:overflow-visible">
-            {navItems.map((item) => {
+            {mainNavItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => onTabChange(item.id)}
-                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ease-out whitespace-nowrap select-none apple-press ${
+                  className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ease-out whitespace-nowrap select-none ${
                     isActive
                       ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_12px_-2px_rgba(255,255,255,0.2)] font-semibold'
                       : 'text-neutral-600 dark:text-neutral-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-neutral-900 dark:hover:text-neutral-100'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 transition-transform duration-200 ${isActive ? 'stroke-[2.5] scale-105' : 'stroke-[1.8]'}`} />
+                  <Icon
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isActive ? 'stroke-[2.5] scale-105' : 'stroke-[1.8]'
+                    }`}
+                  />
                   <span>{item.label}</span>
                 </button>
               );
             })}
           </nav>
+
+          {/* Developer & Extensibility Hub Section */}
+          <div className="pt-2 border-t border-black/[0.06] dark:border-white/[0.06] hidden md:block">
+            <div className="px-3.5 py-1 text-[10px] font-semibold tracking-wider text-neutral-400 dark:text-neutral-500 uppercase">
+              Platform & SDK
+            </div>
+            <div className="mt-1 space-y-1">
+              {devNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onTabChange(item.id)}
+                    className={`w-full flex items-center justify-between px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 ease-out select-none ${
+                      isActive
+                        ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-[0_2px_10px_-2px_rgba(0,0,0,0.15)] dark:shadow-[0_2px_12px_-2px_rgba(255,255,255,0.2)] font-semibold'
+                        : 'text-neutral-600 dark:text-neutral-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-neutral-900 dark:hover:text-neutral-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        className={`w-4 h-4 transition-transform duration-200 ${
+                          isActive ? 'stroke-[2.5] scale-105' : 'stroke-[1.8]'
+                        }`}
+                      />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.badge && (
+                      <span
+                        className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-semibold uppercase ${
+                          isActive
+                            ? 'bg-neutral-700 text-neutral-200 dark:bg-neutral-200 dark:text-neutral-900'
+                            : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Bottom Sidebar Account Section */}
@@ -69,41 +142,36 @@ export const AppShell: React.FC<AppShellProps> = ({
 
           <button
             onClick={onConnectTokenClick}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-neutral-700 dark:text-neutral-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-150 apple-press"
+            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-colors group select-none text-left"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-2.5 truncate">
               {authUser?.avatar_url ? (
                 <img
                   src={authUser.avatar_url}
                   alt={authUser.login}
-                  className="w-5 h-5 rounded-full border border-black/10 dark:border-white/10 flex-shrink-0"
+                  className="w-7 h-7 rounded-full border border-neutral-300 dark:border-neutral-700 object-cover"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center flex-shrink-0">
-                  <Github className="w-3.5 h-3.5 text-neutral-500" />
+                <div className="w-7 h-7 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-400">
+                  <Github className="w-4 h-4" />
                 </div>
               )}
-              <span className="truncate font-medium">
-                {authUser?.name || (authUser?.login ? `@${authUser.login}` : 'GitHub User')}
-              </span>
+              <div className="truncate text-xs">
+                <p className="font-semibold text-neutral-900 dark:text-neutral-100 truncate">
+                  {authUser?.name || authUser?.login || (tokenConnected ? 'Connected User' : 'Guest Account')}
+                </p>
+                <p className="text-[10px] text-neutral-500 truncate">
+                  {tokenConnected ? `@${authUser?.login || 'token-authenticated'}` : 'Click to connect token'}
+                </p>
+              </div>
             </div>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 flex-shrink-0" />
           </button>
         </div>
       </aside>
 
-      {/* Main Content Workspace with smooth inertia scroll */}
-      <main
-        className={`flex-1 w-full min-h-0 min-w-0 flex flex-col ${
-          activeTab === 'visual'
-            ? 'p-2 sm:p-4 overflow-y-auto no-scrollbar h-full'
-            : 'max-w-6xl mx-auto p-4 sm:p-8 overflow-y-auto no-scrollbar'
-        }`}
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        <div className="animate-fade-in w-full flex-1 flex flex-col">
-          {children}
-        </div>
+      {/* Main Content Area */}
+      <main className="flex-1 h-full min-h-0 min-w-0 flex flex-col overflow-hidden relative">
+        {children}
       </main>
     </div>
   );

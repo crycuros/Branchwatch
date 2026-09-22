@@ -29,6 +29,8 @@ import { CommunityHub } from '@/components/community/CommunityHub';
 import { WorkflowDiscussions } from '@/components/community/WorkflowDiscussions';
 import { CommunityWorkflow } from '@/lib/communityTypes';
 import { incrementForkCount, setCurrentUser } from '@/lib/communityStorage';
+import { DeveloperDashboard } from '@/components/developer/DeveloperDashboard';
+import { GitBookDocs } from '@/components/docs/GitBookDocs';
 import { ShieldCheck, Github } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -469,6 +471,26 @@ export default function Home() {
               onForkWorkflowToCanvas={handleForkCommunityWorkflow}
               onOpenPublishModal={() => setActiveTab('visual')}
               onOpenDiscussions={(wf) => setSelectedDiscussionsWorkflow(wf)}
+            />
+          </div>
+        )}
+
+        {/* TAB 5: DEVELOPER DASHBOARD */}
+        {activeTab === 'developer' && (
+          <div className="animate-fade-in w-full h-full min-h-0 flex-1 flex flex-col overflow-hidden">
+            <DeveloperDashboard
+              onOpenDocs={() => setActiveTab('docs')}
+              onOpenWorkflow={() => setActiveTab('visual')}
+            />
+          </div>
+        )}
+
+        {/* TAB 6: GITBOOK-STYLE DOCUMENTATION */}
+        {activeTab === 'docs' && (
+          <div className="animate-fade-in w-full h-full min-h-0 flex-1 flex flex-col overflow-hidden">
+            <GitBookDocs
+              onOpenStudio={() => setActiveTab('developer')}
+              onOpenWorkflow={() => setActiveTab('visual')}
             />
           </div>
         )}
