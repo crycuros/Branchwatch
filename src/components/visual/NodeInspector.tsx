@@ -23,6 +23,7 @@ import {
   Globe,
   Layers,
   ListTree,
+  Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -142,33 +143,38 @@ export const NodeInspector: React.FC<NodeInspectorProps> = ({
                     const isSelected =
                       selectedNode.config.selectedFiles?.includes(file.path) ?? false;
                     return (
-                      <label
+                      <div
                         key={file.path}
-                        className={`p-1.5 rounded-lg flex items-center justify-between gap-2 cursor-pointer transition-colors ${
+                        onClick={() => {
+                          const cur = selectedNode.config.selectedFiles || [];
+                          const isCurrentlySelected = cur.includes(file.path);
+                          const next = isCurrentlySelected
+                            ? cur.filter((p) => p !== file.path)
+                            : [...cur, file.path];
+                          onUpdateConfig(selectedNode.id, {
+                            selectedFiles: next,
+                            filesChangedCount: next.length,
+                          });
+                        }}
+                        className={`p-1.5 rounded-lg flex items-center justify-between gap-2 cursor-pointer transition-colors select-none ${
                           isSelected
                             ? 'bg-neutral-200/80 dark:bg-neutral-800 font-medium text-neutral-900 dark:text-neutral-100'
                             : 'hover:bg-neutral-100 dark:hover:bg-neutral-800/40 text-neutral-600 dark:text-neutral-400'
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              const cur = selectedNode.config.selectedFiles || [];
-                              const next = e.target.checked
-                                ? [...cur, file.path]
-                                : cur.filter((p) => p !== file.path);
-                              onUpdateConfig(selectedNode.id, {
-                                selectedFiles: next,
-                                filesChangedCount: next.length,
-                              });
-                            }}
-                            className="rounded border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100"
-                          />
+                          <div
+                            className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all shrink-0 ${
+                              isSelected
+                                ? 'bg-zinc-100 border-zinc-100 text-zinc-950 dark:bg-white dark:border-white'
+                                : 'border-neutral-400 dark:border-neutral-700 bg-transparent'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                          </div>
                           <span className="truncate">{file.path}</span>
                         </div>
-                      </label>
+                      </div>
                     );
                   })}
                 </div>

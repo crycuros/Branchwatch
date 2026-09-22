@@ -26,6 +26,7 @@ import {
   Sparkles,
   AlertCircle,
   Copy,
+  Check,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -503,67 +504,101 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <label className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.shell ?? true}
-                    onChange={(e) => setPermissions({ ...permissions, shell: e.target.checked })}
-                    className="mt-0.5 rounded bg-zinc-800 border-zinc-700 text-zinc-200"
-                  />
+                {/* Shell Execution */}
+                <div
+                  onClick={() => setPermissions({ ...permissions, shell: !permissions.shell })}
+                  className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
+                    permissions.shell
+                      ? 'border-zinc-700 bg-zinc-900/90 shadow-xs'
+                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30 hover:border-zinc-700/50'
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded border flex items-center justify-center transition-all mt-0.5 shrink-0 ${
+                      permissions.shell
+                        ? 'bg-zinc-100 border-zinc-100 text-zinc-950'
+                        : 'border-zinc-700 bg-zinc-900/80 hover:border-zinc-500'
+                    }`}
+                  >
+                    {permissions.shell && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
                   <div>
                     <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
                       <Terminal className="w-3.5 h-3.5 text-zinc-400" />
-                      Shell Execution
+                      <span>Shell Execution</span>
                     </div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">
                       Spawns local sub-processes (PowerShell, bash, npm, docker).
                     </div>
                   </div>
-                </label>
+                </div>
 
-                <label className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.network ?? false}
-                    onChange={(e) => setPermissions({ ...permissions, network: e.target.checked })}
-                    className="mt-0.5 rounded bg-zinc-800 border-zinc-700 text-zinc-200"
-                  />
+                {/* Network & Webhooks */}
+                <div
+                  onClick={() => setPermissions({ ...permissions, network: !permissions.network })}
+                  className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
+                    permissions.network
+                      ? 'border-zinc-700 bg-zinc-900/90 shadow-xs'
+                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30 hover:border-zinc-700/50'
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded border flex items-center justify-center transition-all mt-0.5 shrink-0 ${
+                      permissions.network
+                        ? 'bg-zinc-100 border-zinc-100 text-zinc-950'
+                        : 'border-zinc-700 bg-zinc-900/80 hover:border-zinc-500'
+                    }`}
+                  >
+                    {permissions.network && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
                   <div>
                     <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5 text-blue-400" />
-                      Network & Webhooks
+                      <span>Network & Webhooks</span>
                     </div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">
                       Allows outbound HTTP requests to remote APIs and services.
                     </div>
                   </div>
-                </label>
+                </div>
 
-                <label className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-900/40 hover:bg-zinc-900/70 flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={permissions.git ?? true}
-                    onChange={(e) => setPermissions({ ...permissions, git: e.target.checked })}
-                    className="mt-0.5 rounded bg-zinc-800 border-zinc-700 text-zinc-200"
-                  />
+                {/* Git Workspace Access */}
+                <div
+                  onClick={() => setPermissions({ ...permissions, git: !permissions.git })}
+                  className={`p-3.5 rounded-xl border transition-all flex items-start gap-3 cursor-pointer select-none ${
+                    permissions.git
+                      ? 'border-zinc-700 bg-zinc-900/90 shadow-xs'
+                      : 'border-zinc-800/60 bg-zinc-950/40 hover:bg-zinc-900/30 hover:border-zinc-700/50'
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded border flex items-center justify-center transition-all mt-0.5 shrink-0 ${
+                      permissions.git
+                        ? 'bg-zinc-100 border-zinc-100 text-zinc-950'
+                        : 'border-zinc-700 bg-zinc-900/80 hover:border-zinc-500'
+                    }`}
+                  >
+                    {permissions.git && <Check className="w-3 h-3 stroke-[3]" />}
+                  </div>
                   <div>
                     <div className="text-xs font-medium text-zinc-200 flex items-center gap-1.5">
                       <GitBranch className="w-3.5 h-3.5 text-zinc-400" />
-                      Git Workspace Access
+                      <span>Git Workspace Access</span>
                     </div>
                     <div className="text-[11px] text-zinc-500 mt-0.5">
                       Reads and modifies local Git branches, refs, and diffs.
                     </div>
                   </div>
-                </label>
+                </div>
 
-                <div className="p-3.5 rounded-lg border border-zinc-800 bg-zinc-900/40 flex items-start gap-3">
+                {/* Filesystem Scope */}
+                <div className="p-3.5 rounded-xl border border-zinc-800/60 bg-zinc-950/40 flex items-start gap-3">
                   <div className="w-full">
                     <div className="text-xs font-medium text-zinc-200 mb-1.5">Filesystem Scope</div>
                     <select
                       value={permissions.filesystem || 'workspace'}
                       onChange={(e) => setPermissions({ ...permissions, filesystem: e.target.value as any })}
-                      className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded text-xs text-zinc-300"
+                      className="w-full px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-300 focus:outline-none focus:border-zinc-700"
                     >
                       <option value="workspace">Workspace Repository Only</option>
                       <option value="none">No Filesystem Access</option>
