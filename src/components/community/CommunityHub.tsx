@@ -142,50 +142,24 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   );
 
   return (
-    <div className="space-y-8 w-full max-w-6xl mx-auto pb-12 animate-fade-in font-sans">
+    <div className="space-y-6 w-full max-w-6xl mx-auto pb-12 animate-fade-in font-sans">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-neutral-200/60 dark:border-neutral-800/80">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 shadow-sm">
-              <Compass className="w-4 h-4" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-              Community Hub & Plugins
-            </h1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-neutral-200/80 dark:border-neutral-800">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 shadow-sm flex-shrink-0">
+            <Compass className="w-5 h-5" />
           </div>
-          <p className="text-xs text-neutral-500 mt-1.5 leading-relaxed">
-            Discover, fork, and reuse Git workflows and install custom community nodes for your visual canvas.
-          </p>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+              Community Hub
+            </h1>
+            <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">
+              Explore shared Git workflows, automation recipes, and community node extensions.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Hub View Switcher */}
-          <div className="flex items-center bg-neutral-100 dark:bg-neutral-800/80 p-1 rounded-xl text-xs font-medium text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
-            <button
-              onClick={() => setHubView('workflows')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
-                hubView === 'workflows'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm font-semibold'
-                  : 'hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Workflows</span>
-            </button>
-            <button
-              onClick={() => setHubView('plugins')}
-              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${
-                hubView === 'plugins'
-                  ? 'bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-sm font-semibold'
-                  : 'hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              <Box className="w-3.5 h-3.5" />
-              <span>Plugins & Nodes</span>
-            </button>
-          </div>
-
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {/* Star BranchWatch on GitHub */}
           <button
             onClick={handleGitHubStarToggle}
@@ -223,11 +197,43 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
           )}
 
           {hubView === 'workflows' && (
-            <Button variant="primary" size="sm" onClick={onOpenPublishModal}>
+            <Button variant="primary" size="sm" onClick={onOpenPublishModal} className="text-xs font-semibold">
               <Plus className="w-3.5 h-3.5" />
               <span>Publish Workflow</span>
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* Navigation Tabs Subheader */}
+      <div className="flex items-center border-b border-neutral-200/80 dark:border-neutral-800 -mt-2">
+        <div className="flex gap-6">
+          <button
+            onClick={() => setHubView('workflows')}
+            className={`pb-3 text-xs font-medium flex items-center gap-2 border-b-2 transition-all ${
+              hubView === 'workflows'
+                ? 'border-neutral-900 dark:border-white text-neutral-900 dark:text-white font-semibold'
+                : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+            }`}
+          >
+            <Compass className="w-4 h-4" />
+            <span>Workflows</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500">
+              {workflows.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setHubView('plugins')}
+            className={`pb-3 text-xs font-medium flex items-center gap-2 border-b-2 transition-all ${
+              hubView === 'plugins'
+                ? 'border-neutral-900 dark:border-white text-neutral-900 dark:text-white font-semibold'
+                : 'border-transparent text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+            }`}
+          >
+            <Box className="w-4 h-4" />
+            <span>Plugins & Nodes</span>
+          </button>
         </div>
       </div>
 

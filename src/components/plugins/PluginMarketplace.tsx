@@ -71,35 +71,7 @@ export const PluginMarketplace: React.FC<PluginMarketplaceProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Header & Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2.5">
-            <Box className="w-5 h-5 stroke-[2.5]" />
-            <span>Plugin & Node Registry</span>
-            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
-              {plugins.length} Available
-            </span>
-          </h2>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-            Discover community-authored nodes, custom automations, and release pipelines. Manage manifests and test in Dev Studio.
-          </p>
-        </div>
-
-        {onOpenDevStudio && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onOpenDevStudio}
-            className="font-semibold"
-          >
-            <Code2 className="w-4 h-4" />
-            <span>Author in Dev Studio</span>
-          </Button>
-        )}
-      </div>
-
-      {/* Filter and Search Bar */}
+      {/* Search and Category Filter Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
           <Search className="w-4 h-4 text-neutral-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
