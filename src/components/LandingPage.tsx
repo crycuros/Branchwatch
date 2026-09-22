@@ -16,15 +16,29 @@ import {
   Eye,
   Plus,
   Minus,
+  Star,
+  BookOpen,
+  Code2,
+  Compass,
+  Check,
+  X,
+  ExternalLink,
+  HardDrive,
+  Globe,
+  Terminal,
+  ShieldCheck,
+  Cpu,
 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { BranchWatchLogo } from './ui/BranchWatchLogo';
+import { NavTab } from './AppShell';
 
 interface LandingPageProps {
   tokenConnected: boolean;
   onConnectGitHubToken: (token: string) => void;
   onStartOAuth: () => void;
   onOpenWorkspace: () => void;
+  onNavigateTab?: (tab: NavTab) => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -32,11 +46,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onConnectGitHubToken,
   onStartOAuth,
   onOpenWorkspace,
+  onNavigateTab,
 }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [authMethod, setAuthMethod] = useState<'oauth' | 'pat'>('oauth');
   const [mounted, setMounted] = useState(false);
+
+  // Legal Modal State
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalTab, setLegalTab] = useState<'terms' | 'privacy' | 'security' | 'mit'>('terms');
+
+  // GitHub Star Count
+  const [starCount, setStarCount] = useState<number | null>(null);
 
   // Scroll tracking state with Continuous LERP Damping
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +69,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   useEffect(() => {
     setMounted(true);
+    fetch('https://api.github.com/repos/crycuros/Branchwatch')
+      .then((res) => res.json())
+      .then((data) => {
+        if (typeof data.stargazers_count === 'number') {
+          setStarCount(data.stargazers_count);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Silky Smooth LERP Animation Frame Loop
@@ -57,7 +87,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     let animId: number;
 
     const loop = () => {
-      // Linear interpolation damping (0.09 factor) for liquid glide
       const diff = targetScrollY.current - currentScrollY.current;
       if (Math.abs(diff) > 0.05) {
         currentScrollY.current += diff * 0.09;
@@ -107,16 +136,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
   };
 
-  // Scroll-linked values
-  const heroOpacity = Math.max(0, 1 - scrollY / 450);
-  const heroScale = Math.max(0.92, 1 - scrollY / 2500);
-  const heroTranslateY = scrollY * 0.25;
+  const handleOpenTabDirect = (tab: NavTab) => {
+    if (onNavigateTab) {
+      onNavigateTab(tab);
+    } else {
+      onOpenWorkspace();
+    }
+  };
 
-  // 3D perspective tilt calculation for showcase
-  const tiltProgress = Math.min(1, Math.max(0, scrollY / 600));
-  const cardRotateX = Math.max(0, 18 - tiltProgress * 18);
-  const cardScale = 0.92 + tiltProgress * 0.08;
-  const cardShadow = tiltProgress > 0.5 ? '0 30px 80px -15px rgba(0,0,0,0.3)' : '0 10px 40px -10px rgba(0,0,0,0.15)';
+  const openLegalDialog = (tab: 'terms' | 'privacy' | 'security' | 'mit') => {
+    setLegalTab(tab);
+    setShowLegalModal(true);
+  };
 
   return (
     <div
@@ -124,24 +155,81 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       className="h-screen w-screen overflow-y-auto overflow-x-hidden bg-neutral-50 dark:bg-[#08090a] text-neutral-900 dark:text-neutral-100 font-sans selection:bg-neutral-900 selection:text-white dark:selection:bg-white dark:selection:text-neutral-900 scroll-smooth"
       style={{ WebkitOverflowScrolling: 'touch' }}
     >
-      {/* Sticky Frosted Glass Navbar */}
-      <header className="sticky top-0 z-50 w-full apple-glass transition-all duration-200">
+      {/* 1. Sticky Frosted Glass Navbar */}
+      <header className="sticky top-0 z-50 w-full apple-glass transition-all duration-200 border-b border-black/[0.06] dark:border-white/[0.06]">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 shadow-sm transition-transform duration-300 hover:scale-105">
-              <BranchWatchLogo className="w-4 h-4" strokeWidth={2.2} />
+          <div className="flex items-center gap-8">
+            <div
+              onClick={() => {
+                if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+              }}
+              className="flex items-center gap-2.5 cursor-pointer select-none"
+            >
+              <div className="w-8 h-8 rounded-xl bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900 shadow-sm transition-transform duration-300 hover:scale-105">
+                <BranchWatchLogo className="w-4 h-4" strokeWidth={2.2} />
+              </div>
+              <span className="font-bold text-base tracking-tight">BranchWatch</span>
             </div>
-            <span className="font-bold text-base tracking-tight">BranchWatch</span>
+
+            {/* Navigation Links */}
+            <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <button
+                onClick={() => handleOpenTabDirect('visual')}
+                className="hover:text-neutral-900 dark:hover:text-white transition-colors"
+              >
+                Visual Workflow
+              </button>
+              <button
+                onClick={() => handleOpenTabDirect('developer')}
+                className="hover:text-neutral-900 dark:hover:text-white transition-colors"
+              >
+                Dev Studio
+              </button>
+              <button
+                onClick={() => handleOpenTabDirect('community')}
+                className="hover:text-neutral-900 dark:hover:text-white transition-colors"
+              >
+                Community
+              </button>
+              <button
+                onClick={() => handleOpenTabDirect('docs')}
+                className="hover:text-neutral-900 dark:hover:text-white transition-colors"
+              >
+                Docs
+              </button>
+              <button
+                onClick={() => openLegalDialog('terms')}
+                className="hover:text-neutral-900 dark:hover:text-white transition-colors"
+              >
+                Security & Terms
+              </button>
+            </nav>
           </div>
 
           <div className="flex items-center gap-3">
+            {/* GitHub Repo Link */}
+            <a
+              href="https://github.com/crycuros/Branchwatch"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border border-neutral-200/80 dark:border-neutral-800 bg-white/60 dark:bg-neutral-900/60 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 transition-colors"
+            >
+              <Github className="w-3.5 h-3.5" />
+              <span>Star</span>
+              {starCount !== null && (
+                <span className="text-[11px] font-mono px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500">
+                  {starCount}
+                </span>
+              )}
+            </a>
+
             {tokenConnected ? (
-              <Button variant="primary" size="sm" onClick={onOpenWorkspace} className="shadow-sm">
+              <Button variant="primary" size="sm" onClick={onOpenWorkspace} className="shadow-sm font-semibold">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 <span>Open Workspace</span>
               </Button>
             ) : (
-              <Button variant="primary" size="sm" onClick={() => setShowAuthModal(true)} className="shadow-sm">
+              <Button variant="primary" size="sm" onClick={() => setShowAuthModal(true)} className="shadow-sm font-semibold">
                 <Github className="w-4 h-4" />
                 <span>Connect GitHub</span>
               </Button>
@@ -150,360 +238,462 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </header>
 
-      {/* Hero Section with Parallax Scaling & Floating Glass Badges */}
-      <section className="relative min-h-[90vh] max-w-6xl mx-auto px-6 pt-20 pb-16 flex flex-col items-center justify-center text-center">
-        {/* Ambient Glow Depth Layer */}
-        <div
-          className="absolute pointer-events-none w-[650px] h-[350px] bg-gradient-to-tr from-blue-500/15 via-purple-500/10 to-emerald-500/15 rounded-full blur-[100px] -top-10 left-1/2 -translate-x-1/2 -z-10 animate-pulse-glow"
-        />
+      {/* 2. Hero Section */}
+      <section className="relative min-h-[85vh] max-w-6xl mx-auto px-6 pt-16 pb-16 flex flex-col items-center justify-center text-center">
+        {/* Ambient Depth Layer */}
+        <div className="absolute pointer-events-none w-[650px] h-[350px] bg-gradient-to-tr from-blue-500/10 via-neutral-500/5 to-emerald-500/10 rounded-full blur-[120px] -top-10 left-1/2 -translate-x-1/2 -z-10" />
 
-        {/* Floating Parallax Depth Badge Left */}
-        <div className="hidden lg:block absolute left-8 top-32 pointer-events-none animate-float-left">
-          <div className="apple-glass-card rounded-2xl p-3.5 flex items-center gap-3 shadow-xl">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <div className="text-left font-mono">
-              <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">main · 0 uncommitted</div>
-              <div className="text-[10px] text-neutral-400">Clean working tree</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Floating Parallax Depth Badge Right */}
-        <div className="hidden lg:block absolute right-8 top-44 pointer-events-none animate-float-right">
-          <div className="apple-glass-card rounded-2xl p-3.5 flex items-center gap-3 shadow-xl">
-            <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
-              <GitMerge className="w-4 h-4" />
-            </div>
-            <div className="text-left font-mono">
-              <div className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">+182 / -47 lines</div>
-              <div className="text-[10px] text-neutral-400">Auto diff synced</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Core Hero Content with Scroll Transform */}
-        <div
-          style={{
-            opacity: heroOpacity,
-            transform: `scale(${heroScale}) translateY(${heroTranslateY}px)`,
-            willChange: 'transform, opacity',
-          }}
-          className="max-w-4xl space-y-6"
-        >
-          <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-md text-xs font-medium text-neutral-700 dark:text-neutral-300 animate-slide-up stagger-1">
-            <span>Enterprise Git Topology & Real-Time Intelligence</span>
+        <div className="space-y-6 max-w-3xl mx-auto">
+          {/* Release Badge */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-neutral-800/80 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="font-semibold">BranchWatch v1.0 Production</span>
+            <span className="text-neutral-400">·</span>
+            <span>Extensible Git Graph & Automation Engine</span>
           </div>
 
-          <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-[1.08] animate-slide-up stagger-2">
-            Understand every branch. <br />
-            <span className="text-neutral-400 dark:text-neutral-500 font-medium">At a glance.</span>
+          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-neutral-900 dark:text-neutral-100 leading-[1.1]">
+            The open-source Git visualizer & node automation engine.
           </h1>
 
-          <p className="text-lg sm:text-2xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto font-normal leading-relaxed animate-slide-up stagger-3">
-            Monitor real-time repository commits, multi-branch topologies, live visual code diffs, and node-based git workflows in one centralized workspace.
+          <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
+            Inspect working trees, explore branch commit stacks, chain custom CLI and webhook scripts as visual nodes, and collaborate across open-source recipes with zero automatic remote pushes.
           </p>
 
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up stagger-4">
-            {tokenConnected ? (
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full sm:w-auto px-8 py-3.5 text-base shadow-xl"
-                onClick={onOpenWorkspace}
-              >
-                <span>Open Your Workspace</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full sm:w-auto px-8 py-3.5 text-base shadow-xl"
-                onClick={() => setShowAuthModal(true)}
-              >
-                <Github className="w-5 h-5" />
-                <span>Connect GitHub Account</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Sticky 3D Product Showcase with Continuous Scroll Interpolation */}
-      <section className="relative min-h-[220vh] max-w-6xl mx-auto px-6">
-        {/* Ambient background light pool for frosted refraction */}
-        <div
-          className="absolute pointer-events-none w-[750px] h-[450px] bg-gradient-to-br from-indigo-500/10 via-sky-500/10 to-emerald-500/10 rounded-full blur-[120px] top-20 left-1/2 -translate-x-1/2 -z-10"
-          style={{ transform: `translate(-50%, ${scrollY * 0.12}px)` }}
-        />
-
-        <div className="sticky top-24 z-20 flex flex-col items-center">
-          {/* Scroll progress segment control bar */}
-          <div className="mb-6 flex items-center gap-1.5 p-1 rounded-2xl bg-black/[0.04] dark:bg-white/[0.06] border border-black/[0.06] dark:border-white/[0.08] backdrop-blur-xl">
-            <button
-              onClick={() => setActiveFeatureIndex(0)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 apple-press ${
-                activeFeatureIndex === 0
-                  ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm font-semibold'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              1. Topology Graph
-            </button>
-            <button
-              onClick={() => setActiveFeatureIndex(1)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 apple-press ${
-                activeFeatureIndex === 1
-                  ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm font-semibold'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              2. Live Visual Diff
-            </button>
-            <button
-              onClick={() => setActiveFeatureIndex(2)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 apple-press ${
-                activeFeatureIndex === 2
-                  ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm font-semibold'
-                  : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-              }`}
-            >
-              3. Visual Git Engine
-            </button>
-          </div>
-
-          {/* 3D Perspective Device Stage */}
-          <div
-            style={{
-              perspective: '1200px',
-              width: '100%',
-              maxWidth: '1000px',
-            }}
-          >
-            <div
-              style={{
-                transform: `rotateX(${cardRotateX}deg) scale(${cardScale})`,
-                boxShadow: cardShadow,
-                transformOrigin: 'top center',
-                transition: 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease',
-              }}
-              className="apple-glass-card rounded-2xl overflow-hidden p-2 sm:p-3 border border-black/[0.08] dark:border-white/[0.1]"
-            >
-              {/* Device Window Frame */}
-              <div className="rounded-xl bg-white/90 dark:bg-[#0d1117]/95 border border-black/[0.06] dark:border-white/[0.08] overflow-hidden">
-                {/* Titlebar */}
-                <div className="flex items-center justify-between px-4 py-3 bg-black/[0.02] dark:bg-white/[0.02] border-b border-black/[0.06] dark:border-white/[0.06]">
-                  <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full bg-rose-500/80" />
-                    <span className="w-3 h-3 rounded-full bg-amber-500/80" />
-                    <span className="w-3 h-3 rounded-full bg-emerald-500/80" />
-                    <span className="ml-2 font-mono text-xs text-neutral-400">BranchWatch · workspace/crycuros</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-xs font-mono text-neutral-400">
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
-                      ● Active HEAD
-                    </span>
-                  </div>
-                </div>
-
-                {/* Dynamic Scrubbing View Content */}
-                <div className="p-6 min-h-[380px] flex flex-col justify-center">
-                  {/* Mode 1: Topology Graph */}
-                  {activeFeatureIndex === 0 && (
-                    <div className="space-y-4 animate-fade-in font-mono text-xs">
-                      <div className="flex items-center justify-between pb-2 border-b border-black/[0.05] dark:border-white/[0.05]">
-                        <span className="font-semibold text-neutral-800 dark:text-neutral-200">Branch History & Commit Lanes</span>
-                        <span className="text-neutral-400">Bezier Curve Topology</span>
-                      </div>
-
-                      <div className="space-y-3">
-                        <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20" />
-                            <div>
-                              <div className="font-semibold text-neutral-900 dark:text-neutral-100">main</div>
-                              <div className="text-[11px] text-neutral-400">Optimize multi-branch synchronization and merge resolution</div>
-                            </div>
-                          </div>
-                          <span className="text-neutral-400">2 mins ago</span>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-blue-500/20" />
-                            <div>
-                              <div className="font-semibold text-neutral-900 dark:text-neutral-100">feature/visual-diff</div>
-                              <div className="text-[11px] text-neutral-400">Side-by-side gutter line comparison viewer</div>
-                            </div>
-                          </div>
-                          <span className="text-neutral-400">1 hour ago</span>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 ring-4 ring-purple-500/20" />
-                            <div>
-                              <div className="font-semibold text-neutral-900 dark:text-neutral-100">feature/workflow-canvas</div>
-                              <div className="text-[11px] text-neutral-400">Connect working tree, staging, and commits via node wires</div>
-                            </div>
-                          </div>
-                          <span className="text-neutral-400">Yesterday</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mode 2: Live Code Diff */}
-                  {activeFeatureIndex === 1 && (
-                    <div className="space-y-4 animate-fade-in font-mono text-xs">
-                      <div className="flex items-center justify-between pb-2 border-b border-black/[0.05] dark:border-white/[0.05]">
-                        <span className="font-semibold text-neutral-800 dark:text-neutral-200">High-Precision Syntax Diff</span>
-                        <div className="flex items-center gap-3 font-semibold">
-                          <span className="text-[#7ee787] flex items-center gap-0.5"><Plus className="w-3.5 h-3.5" /> 182</span>
-                          <span className="text-[#ff7b72] flex items-center gap-0.5"><Minus className="w-3.5 h-3.5" /> 47</span>
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-black/[0.08] dark:border-white/[0.1] bg-[#0d1117] text-[#c9d1d9] p-3 text-[11px] leading-relaxed overflow-hidden">
-                        <div className="text-[#8b949e] pb-1">@@ -14,6 +14,18 @@ export const TopologyEngine = () =&gt; &#123;</div>
-                        <div className="bg-[#1f382a]/50 text-[#7ee787] px-2 py-0.5 rounded flex items-center gap-2">
-                          <span className="text-[#8b949e] select-none">15 +</span>
-                          <span>+ const branchTree = await git.getBranchTopology(repoId);</span>
-                        </div>
-                        <div className="bg-[#1f382a]/50 text-[#7ee787] px-2 py-0.5 rounded flex items-center gap-2">
-                          <span className="text-[#8b949e] select-none">16 +</span>
-                          <span>+ const syncStatus = await git.calculateDivergence(branchTree);</span>
-                        </div>
-                        <div className="bg-[#3f191f]/50 text-[#ff7b72] px-2 py-0.5 rounded flex items-center gap-2">
-                          <span className="text-[#8b949e] select-none">17 -</span>
-                          <span>- const legacyBranches = await git.getFlatBranches();</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Mode 3: Visual Git Engine */}
-                  {activeFeatureIndex === 2 && (
-                    <div className="space-y-4 animate-fade-in font-mono text-xs">
-                      <div className="flex items-center justify-between pb-2 border-b border-black/[0.05] dark:border-white/[0.05]">
-                        <span className="font-semibold text-neutral-800 dark:text-neutral-200">Visual Workflow Canvas</span>
-                        <span className="text-neutral-400">Node-Based Git Operations</span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="p-3.5 rounded-xl apple-glass-card space-y-2 border border-black/[0.06] dark:border-white/[0.08]">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold">Working Tree</span>
-                            <span className="text-emerald-500 font-bold">✓ Ready</span>
-                          </div>
-                          <div className="text-[11px] text-neutral-400">3 modified files</div>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl apple-glass-card space-y-2 border border-blue-500/30 ring-1 ring-blue-500/20">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold">Stage Changes</span>
-                            <span className="text-blue-500 font-bold">Staged</span>
-                          </div>
-                          <div className="text-[11px] text-neutral-400">git add .</div>
-                        </div>
-
-                        <div className="p-3.5 rounded-xl apple-glass-card space-y-2 border border-black/[0.06] dark:border-white/[0.08]">
-                          <div className="flex items-center justify-between">
-                            <span className="font-semibold">Commit & Push</span>
-                            <span className="text-purple-500 font-bold">#d2f8a1e</span>
-                          </div>
-                          <div className="text-[11px] text-neutral-400">origin/main</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Feature Narrative Grid */}
-      <section className="relative max-w-5xl mx-auto px-6 py-28 space-y-20">
-        <div
-          className="absolute pointer-events-none w-[600px] h-[350px] bg-gradient-to-tr from-purple-500/8 via-blue-500/8 to-teal-500/8 rounded-full blur-[100px] top-1/3 left-1/2 -translate-x-1/2 -z-10"
-        />
-
-        <div className="text-center space-y-3">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            Engineered for high-velocity software teams.
-          </h2>
-          <p className="text-base text-neutral-500 dark:text-neutral-400 max-w-xl mx-auto">
-            Purpose-built for engineering teams needing absolute clarity over complex repository states, merges, and commit histories.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl apple-glass-card space-y-3 apple-interactive">
-            <div className="w-10 h-10 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] flex items-center justify-center text-neutral-800 dark:text-neutral-200">
-              <GitBranch className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-lg text-neutral-900 dark:text-neutral-100">Multi-Branch Topology</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-              Visualize branch divergence, ahead/behind commit deltas, and parent-child merge histories across all active remote branches.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl apple-glass-card space-y-3 apple-interactive">
-            <div className="w-10 h-10 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] flex items-center justify-center text-neutral-800 dark:text-neutral-200">
-              <FileCode className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-lg text-neutral-900 dark:text-neutral-100">Visual Diff Engine</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-              Inspect line-by-line syntax-highlighted additions, deletions, and uncommitted file modifications with side-by-side gutter comparison.
-            </p>
-          </div>
-
-          <div className="p-6 rounded-2xl apple-glass-card space-y-3 apple-interactive">
-            <div className="w-10 h-10 rounded-xl bg-black/[0.04] dark:bg-white/[0.06] flex items-center justify-center text-neutral-800 dark:text-neutral-200">
-              <Shield className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-lg text-neutral-900 dark:text-neutral-100">Direct GitHub API Sync</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-              Zero-latency repository synchronization directly through official GitHub OAuth and Personal Access Tokens with complete data integrity.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Bottom CTA Banner */}
-      <section className="max-w-4xl mx-auto px-6 pb-24 text-center">
-        <div className="p-8 sm:p-12 rounded-3xl apple-glass-card space-y-6 shadow-2xl relative overflow-hidden">
-          <div className="max-w-xl mx-auto space-y-3">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-              Ready to experience modern Git tracking?
-            </h2>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-              Connect your GitHub account to start tracking branches and repositories in real-time.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
             <Button
               variant="primary"
               size="lg"
-              className="w-full sm:w-auto px-8 py-3.5 shadow-xl text-base"
-              onClick={() => setShowAuthModal(true)}
+              className="w-full sm:w-auto px-8 py-3.5 shadow-lg text-sm font-semibold"
+              onClick={onOpenWorkspace}
             >
-              <Github className="w-5 h-5" />
-              <span>Connect GitHub Account</span>
-              <ArrowRight className="w-4 h-4 ml-1" />
+              <span>Launch Studio</span>
+              <ArrowRight className="w-4 h-4 ml-1.5" />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto px-6 py-3.5 text-sm font-semibold"
+              onClick={() => handleOpenTabDirect('docs')}
+            >
+              <BookOpen className="w-4 h-4 mr-2" />
+              <span>Read Documentation</span>
             </Button>
           </div>
         </div>
       </section>
 
-      {/* Auth Modal with Frosted Glass Portal */}
+      {/* 3. Core Feature Pillars Grid */}
+      <section className="max-w-6xl mx-auto px-6 py-16">
+        <div className="text-center space-y-3 mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+            Built for modern engineering teams & open-source contributors
+          </h2>
+          <p className="text-xs sm:text-sm text-neutral-500 max-w-xl mx-auto">
+            A high-performance offline-first architecture providing deep Git inspection, custom scripting, and typed workflow composability.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1 */}
+          <div className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700">
+              <Workflow className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">Visual Node Canvas</h3>
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              Connect working tree changes, stage, commit, branch, and remote nodes with typed input and output ports on an infinite visual canvas.
+            </p>
+          </div>
+
+          {/* Card 2 */}
+          <div className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700">
+              <Code2 className="w-5 h-5" />
+            </div>
+            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">Script & Node Studio</h3>
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              Author Shell, Node.js, Python, and Webhook tasks. Zero-config auto-discovery via <code className="font-mono text-neutral-800 dark:text-neutral-200">.branchwatch/nodes/*.json</code>.
+            </p>
+          </div>
+
+          {/* Card 3 */}
+          <div className="p-6 rounded-2xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/40 shadow-subtle space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-900 dark:text-white border border-neutral-200 dark:border-neutral-700">
+              <ShieldCheck className="w-5 h-5 text-emerald-500" />
+            </div>
+            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">Security Clearance Model</h3>
+            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              Declared permissions (<code className="font-mono text-neutral-800 dark:text-neutral-200">shell</code>, <code className="font-mono text-neutral-800 dark:text-neutral-200">fs</code>, <code className="font-mono text-neutral-800 dark:text-neutral-200">network</code>) gated by explicit user consent. Zero automatic remote pushes.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 4. Bottom CTA Section */}
+      <section className="max-w-4xl mx-auto px-6 py-16 text-center">
+        <div className="p-8 sm:p-12 rounded-3xl border border-neutral-200/80 dark:border-neutral-800/80 bg-white dark:bg-neutral-900/60 shadow-xl space-y-6 relative overflow-hidden">
+          <div className="max-w-xl mx-auto space-y-3">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+              Ready to elevate your Git workflow?
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
+              Open the workspace studio directly or connect your GitHub account for real-time repository tracking.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full sm:w-auto px-8 py-3 font-semibold text-xs"
+              onClick={onOpenWorkspace}
+            >
+              <span>Launch Studio</span>
+              <ArrowRight className="w-4 h-4 ml-1.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full sm:w-auto px-6 py-3 font-semibold text-xs"
+              onClick={() => setShowAuthModal(true)}
+            >
+              <Github className="w-4 h-4 mr-1.5" />
+              <span>Connect GitHub</span>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. Production Enterprise & Open-Source Footer */}
+      <footer className="border-t border-neutral-200/80 dark:border-neutral-800 bg-white/40 dark:bg-neutral-950/60 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-6 pt-12 pb-8">
+          {/* Top 4-Column Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-10 border-b border-neutral-200/60 dark:border-neutral-800/60 text-xs">
+            {/* Column 1: Brand & Overview */}
+            <div className="col-span-2 md:col-span-1 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-neutral-900 dark:bg-white flex items-center justify-center text-white dark:text-neutral-900">
+                  <BranchWatchLogo className="w-3.5 h-3.5" strokeWidth={2.4} />
+                </div>
+                <span className="font-bold text-sm tracking-tight text-neutral-900 dark:text-neutral-100">BranchWatch</span>
+              </div>
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                Developer-first Git visualization and node automation platform. Shipped as open source under the MIT License.
+              </p>
+              <div className="inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+                <span>MIT Open Source</span>
+              </div>
+            </div>
+
+            {/* Column 2: Product & Engine */}
+            <div className="space-y-2.5">
+              <span className="font-semibold text-neutral-900 dark:text-neutral-100 uppercase tracking-wider text-[10px]">
+                Product
+              </span>
+              <ul className="space-y-2 text-neutral-500 dark:text-neutral-400 text-xs">
+                <li>
+                  <button onClick={() => handleOpenTabDirect('visual')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Visual Workflow Engine
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleOpenTabDirect('graph')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Git Commits Stack
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleOpenTabDirect('developer')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Dev Studio
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleOpenTabDirect('community')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Community Hub
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: Developers & Ecosystem */}
+            <div className="space-y-2.5">
+              <span className="font-semibold text-neutral-900 dark:text-neutral-100 uppercase tracking-wider text-[10px]">
+                Developers
+              </span>
+              <ul className="space-y-2 text-neutral-500 dark:text-neutral-400 text-xs">
+                <li>
+                  <button onClick={() => handleOpenTabDirect('docs')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Documentation Portal
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleOpenTabDirect('docs')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Zero-Config Porting Spec
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => handleOpenTabDirect('developer')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Schema v1 Validator
+                  </button>
+                </li>
+                <li>
+                  <a href="https://github.com/crycuros/Branchwatch" target="_blank" rel="noopener noreferrer" className="hover:text-neutral-900 dark:hover:text-white inline-flex items-center gap-1 transition-colors">
+                    <span>GitHub Repository</span>
+                    <ExternalLink className="w-3 h-3 text-neutral-400" />
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 4: Legal & Security */}
+            <div className="space-y-2.5">
+              <span className="font-semibold text-neutral-900 dark:text-neutral-100 uppercase tracking-wider text-[10px]">
+                Legal & Governance
+              </span>
+              <ul className="space-y-2 text-neutral-500 dark:text-neutral-400 text-xs">
+                <li>
+                  <button onClick={() => openLegalDialog('terms')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Terms of Service
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => openLegalDialog('privacy')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Privacy Policy
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => openLegalDialog('security')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    Security & Clearance Model
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => openLegalDialog('mit')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                    MIT License Terms
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Bottom Bar: Status, Copyright & Legal Links */}
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500 font-mono">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>All Systems Operational (Local Engine v1.0.0-prod)</span>
+            </div>
+
+            <div className="flex items-center gap-4 text-[11px]">
+              <span>© {new Date().getFullYear()} crycuros / Branchwatch</span>
+              <button onClick={() => openLegalDialog('terms')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                Terms
+              </button>
+              <button onClick={() => openLegalDialog('privacy')} className="hover:text-neutral-900 dark:hover:text-white transition-colors">
+                Privacy
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* 6. Production Legal & Security Center Modal */}
+      {showLegalModal && mounted && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[99999] bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans"
+            onClick={() => setShowLegalModal(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-2xl max-h-[85vh] bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-900 bg-zinc-900/40">
+                <div className="flex items-center gap-2.5">
+                  <Shield className="w-4 h-4 text-zinc-300" />
+                  <h3 className="font-semibold text-sm text-zinc-100">Legal, Governance & Security Center</h3>
+                </div>
+                <button
+                  onClick={() => setShowLegalModal(false)}
+                  className="p-1 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Legal Tabs */}
+              <div className="flex items-center px-6 border-b border-zinc-900 bg-zinc-950 text-xs font-medium">
+                <button
+                  onClick={() => setLegalTab('terms')}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    legalTab === 'terms'
+                      ? 'border-zinc-200 text-zinc-100 font-semibold'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Terms of Service
+                </button>
+                <button
+                  onClick={() => setLegalTab('privacy')}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    legalTab === 'privacy'
+                      ? 'border-zinc-200 text-zinc-100 font-semibold'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Privacy Policy
+                </button>
+                <button
+                  onClick={() => setLegalTab('security')}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    legalTab === 'security'
+                      ? 'border-zinc-200 text-zinc-100 font-semibold'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Security Clearance Model
+                </button>
+                <button
+                  onClick={() => setLegalTab('mit')}
+                  className={`py-3 px-3 border-b-2 transition-colors ${
+                    legalTab === 'mit'
+                      ? 'border-zinc-200 text-zinc-100 font-semibold'
+                      : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  MIT License
+                </button>
+              </div>
+
+              {/* Modal Content Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs text-zinc-300 leading-relaxed font-sans">
+                {legalTab === 'terms' && (
+                  <div className="space-y-3.5">
+                    <h4 className="font-bold text-sm text-zinc-100">1. Terms of Service & Code Execution</h4>
+                    <p>
+                      BranchWatch is a developer-first platform for visual Git workflow automation and script execution. By using BranchWatch and its node execution engine, you agree to these terms:
+                    </p>
+                    <div className="p-3 bg-zinc-900/60 rounded-xl border border-zinc-800/80 space-y-2">
+                      <div className="font-semibold text-zinc-100">Local Execution & Responsibility</div>
+                      <p className="text-zinc-400 text-[11px]">
+                        Custom nodes execute code directly on your local machine under your OS user account permissions. You are solely responsible for reviewing community manifests before granting execution clearance.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-zinc-900/60 rounded-xl border border-zinc-800/80 space-y-2">
+                      <div className="font-semibold text-zinc-100">Zero Remote Push Guarantee</div>
+                      <p className="text-zinc-400 text-[11px]">
+                        BranchWatch will never execute destructive remote push commands (<code className="text-zinc-200 font-mono">git push --force</code>, <code className="text-zinc-200 font-mono">git push origin</code>) without explicit manual user approval.
+                      </p>
+                    </div>
+                    <div className="p-3 bg-zinc-900/60 rounded-xl border border-zinc-800/80 space-y-2">
+                      <div className="font-semibold text-zinc-100">Acceptable Use & Malicious Payloads</div>
+                      <p className="text-zinc-400 text-[11px]">
+                        Submitting malicious scripts, cryptominers, or destructive binaries to the open-source registry is strictly prohibited and results in immediate blocking.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {legalTab === 'privacy' && (
+                  <div className="space-y-3.5">
+                    <h4 className="font-bold text-sm text-zinc-100">2. Privacy & Data Security Policy</h4>
+                    <p>
+                      BranchWatch operates under an offline-first, zero-telemetry philosophy.
+                    </p>
+                    <ul className="space-y-2 list-disc list-inside text-zinc-400 text-[11px]">
+                      <li><strong className="text-zinc-200">Local-Only Data Storage:</strong> All branch graphs, commit histories, working tree diffs, and node configurations remain strictly on your local disk.</li>
+                      <li><strong className="text-zinc-200">GitHub Token Security:</strong> Personal Access Tokens (PAT) and OAuth sessions are stored only in local browser client storage (<code className="font-mono text-zinc-300">localStorage</code>) and are sent solely to <code className="font-mono text-zinc-300">api.github.com</code>.</li>
+                      <li><strong className="text-zinc-200">No Telemetry / Behavioral Tracking:</strong> BranchWatch does not bundle Google Analytics, Mixpanel, or third-party user tracking beacons.</li>
+                      <li><strong className="text-zinc-200">Webhook Data Routing:</strong> Webhook nodes transmit payloads strictly to the remote endpoints explicitly configured by you.</li>
+                    </ul>
+                  </div>
+                )}
+
+                {legalTab === 'security' && (
+                  <div className="space-y-3.5">
+                    <h4 className="font-bold text-sm text-zinc-100">3. Security Clearance & Permission Architecture</h4>
+                    <p>
+                      To prevent unauthorized command execution from unvetted repositories, BranchWatch enforces an explicit capability security matrix:
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                      <div className="p-2.5 bg-zinc-900/80 rounded-lg border border-zinc-800">
+                        <span className="text-amber-400 font-bold block mb-0.5">shell: true</span>
+                        <span className="text-zinc-400">Allows spawning local sub-processes (PowerShell/sh).</span>
+                      </div>
+                      <div className="p-2.5 bg-zinc-900/80 rounded-lg border border-zinc-800">
+                        <span className="text-blue-400 font-bold block mb-0.5">filesystem: "workspace"</span>
+                        <span className="text-zinc-400">Restricts file modifications to active repository root.</span>
+                      </div>
+                      <div className="p-2.5 bg-zinc-900/80 rounded-lg border border-zinc-800">
+                        <span className="text-purple-400 font-bold block mb-0.5">network: true</span>
+                        <span className="text-zinc-400">Allows outbound HTTP/REST webhook requests.</span>
+                      </div>
+                      <div className="p-2.5 bg-zinc-900/80 rounded-lg border border-zinc-800">
+                        <span className="text-emerald-400 font-bold block mb-0.5">git: true</span>
+                        <span className="text-zinc-400">Allows inspecting and mutating local Git refs.</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {legalTab === 'mit' && (
+                  <div className="space-y-3 font-mono text-[11px]">
+                    <h4 className="font-bold text-sm font-sans text-zinc-100">4. MIT License</h4>
+                    <pre className="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800 text-zinc-300 whitespace-pre-wrap leading-relaxed">
+{`Copyright (c) 2026 crycuros / Branchwatch
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-900 bg-zinc-900/40">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowLegalModal(false);
+                    handleOpenTabDirect('docs');
+                  }}
+                  className="text-xs"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Open Full Documentation</span>
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowLegalModal(false)}
+                  className="text-xs font-semibold"
+                >
+                  <span>Close</span>
+                </Button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* 7. Auth Modal */}
       {showAuthModal && mounted && typeof document !== 'undefined' &&
         createPortal(
           <div
@@ -559,7 +749,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <Button
                     variant="primary"
                     size="md"
-                    className="w-full py-2.5"
+                    className="w-full py-2.5 font-semibold"
                     onClick={onStartOAuth}
                   >
                     <Github className="w-4 h-4" />
@@ -581,7 +771,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     />
                   </div>
 
-                  <Button variant="primary" type="submit" className="w-full py-2.5">
+                  <Button variant="primary" type="submit" className="w-full py-2.5 font-semibold">
                     Save & Connect
                   </Button>
                 </form>

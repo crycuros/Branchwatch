@@ -364,6 +364,10 @@ export default function Home() {
         onConnectGitHubToken={handleConnectToken}
         onStartOAuth={handleStartOAuth}
         onOpenWorkspace={() => setIsLandingPage(false)}
+        onNavigateTab={(tab) => {
+          setIsLandingPage(false);
+          setActiveTab(tab);
+        }}
       />
     );
   }
