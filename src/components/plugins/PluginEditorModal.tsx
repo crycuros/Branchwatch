@@ -28,6 +28,7 @@ import {
   Check,
   HardDrive,
   Cpu,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -139,6 +140,16 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
   const [isSaved, setIsSaved] = useState(false);
   const [copiedJson, setCopiedJson] = useState(false);
 
+  // Context & Environment Simulator State
+  const [simBranch, setSimBranch] = useState(currentBranch || 'feature/login-module');
+  const [simAhead, setSimAhead] = useState('2');
+  const [simBehind, setSimBehind] = useState('0');
+  const [simCommittedFiles, setSimCommittedFiles] = useState('src/auth.ts,src/api/auth.ts');
+
+  // PR Submitter State
+  const [isPrModalOpen, setIsPrModalOpen] = useState(false);
+  const [copiedPrJson, setCopiedPrJson] = useState(false);
+
   // Test Runner State
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'success' | 'failed'>('idle');
   const [testLogs, setTestLogs] = useState<{ stdout: string; stderr: string; exitCode?: number; status?: number; durationMs?: number } | null>(null);
@@ -198,11 +209,11 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                 }
               : undefined,
           context: {
-            BW_CURRENT_BRANCH: currentBranch || 'main',
+            BW_CURRENT_BRANCH: simBranch || 'main',
             BW_REPO_PATH: repoPath || process.cwd?.() || '',
-            BW_COMMITTED_FILES: 'src/index.ts,src/App.tsx',
-            BW_AHEAD_COUNT: '2',
-            BW_BEHIND_COUNT: '0',
+            BW_COMMITTED_FILES: simCommittedFiles || '',
+            BW_AHEAD_COUNT: simAhead || '0',
+            BW_BEHIND_COUNT: simBehind || '0',
           },
         }),
       });
@@ -788,14 +799,119 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: TEST RUNNER CONSOLE */}
+          {/* TAB 4: TEST RUNNER CONSOLE & CONTEXT SIMULATOR */}
           {activeTab === 'runner' && (
             <div className="space-y-4">
+              {/* Context & Environment Simulator */}
+              <div className="p-3.5 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="text-xs font-semibold text-zinc-200">Context & Environment Simulator</span>
+                  </div>
+                  {/* Presets */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-zinc-500 font-mono mr-1">Preset:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSimBranch('feature/login-jwt');
+                        setSimAhead('3');
+                        setSimBehind('0');
+                        setSimCommittedFiles('src/auth.ts,src/index.ts');
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono"
+                    >
+                      Feature
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSimBranch('release/v2.1.0');
+                        setSimAhead('8');
+                        setSimBehind('0');
+                        setSimCommittedFiles('package.json,CHANGELOG.md');
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono"
+                    >
+                      Release
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSimBranch('hotfix/db-leak');
+                        setSimAhead('1');
+                        setSimBehind('4');
+                        setSimCommittedFiles('prisma/schema.prisma');
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono"
+                    >
+                      Hotfix
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSimBranch('main');
+                        setSimAhead('0');
+                        setSimBehind('0');
+                        setSimCommittedFiles('');
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono"
+                    >
+                      Main
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <label className="text-[10px] font-mono text-zinc-400 block mb-1">BW_CURRENT_BRANCH</label>
+                    <input
+                      type="text"
+                      value={simBranch}
+                      onChange={(e) => setSimBranch(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-zinc-400 block mb-1">BW_COMMITTED_FILES</label>
+                    <input
+                      type="text"
+                      value={simCommittedFiles}
+                      onChange={(e) => setSimCommittedFiles(e.target.value)}
+                      placeholder="e.g. src/auth.ts,prisma/schema.prisma"
+                      className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-400 block mb-1">BW_AHEAD</label>
+                      <input
+                        type="number"
+                        value={simAhead}
+                        onChange={(e) => setSimAhead(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono text-zinc-400 block mb-1">BW_BEHIND</label>
+                      <input
+                        type="number"
+                        value={simBehind}
+                        onChange={(e) => setSimBehind(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sandbox Header */}
               <div className="flex items-center justify-between pb-2 border-b border-zinc-900">
                 <div>
                   <h3 className="text-xs font-semibold text-zinc-100">Live Workspace Execution Sandbox</h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Execute this node against the active repository path ({repoPath || 'default workspace'}).
+                    Execute against active workspace ({repoPath || 'default workspace'}) with simulated environment variables.
                   </p>
                 </div>
                 <button
@@ -808,18 +924,18 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
                 </button>
               </div>
 
-              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs space-y-3 min-h-[220px]">
+              <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 font-mono text-xs space-y-3 min-h-[180px]">
                 {testStatus === 'idle' && (
-                  <div className="text-zinc-600 flex flex-col items-center justify-center py-12">
+                  <div className="text-zinc-600 flex flex-col items-center justify-center py-8">
                     <Terminal className="w-8 h-8 mb-2 opacity-30" />
-                    <span>Click &ldquo;Run Test&rdquo; to execute and inspect live terminal output.</span>
+                    <span>Click &ldquo;Run Test&rdquo; to execute and inspect live simulated output.</span>
                   </div>
                 )}
 
                 {testStatus === 'running' && (
                   <div className="text-amber-400 flex items-center gap-2.5 py-6">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                    <span>Executing script in isolated runner...</span>
+                    <span>Executing script with simulated context...</span>
                   </div>
                 )}
 
@@ -903,13 +1019,23 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
 
         {/* 4. Studio Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-900 bg-zinc-900/30">
-          <button
-            onClick={handleDownloadJson}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-1.5"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export Manifest JSON</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDownloadJson}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 transition-colors flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export Schema JSON</span>
+            </button>
+            <button
+              onClick={() => setIsPrModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl text-xs font-medium text-zinc-300 hover:text-white bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 transition-colors flex items-center gap-1.5"
+            >
+              <GitPullRequest className="w-3.5 h-3.5 text-blue-400" />
+              <span>Submit to Community PR</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
@@ -926,6 +1052,65 @@ export const PluginEditorModal: React.FC<PluginEditorModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Community PR Modal Dialog */}
+        {isPrModalOpen && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                <div className="flex items-center gap-2.5">
+                  <GitPullRequest className="w-4 h-4 text-blue-400" />
+                  <h3 className="text-sm font-semibold text-zinc-100">Submit Node to Official Registry</h3>
+                </div>
+                <button
+                  onClick={() => setIsPrModalOpen(false)}
+                  className="p-1 text-zinc-500 hover:text-zinc-300"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                BranchWatch is an open-source platform. You can contribute your custom node to the community registry by submitting a PR to <code className="text-zinc-200 font-mono">crycuros/Branchwatch</code>.
+              </p>
+
+              <div className="p-3 bg-zinc-900/60 rounded-xl border border-zinc-800 text-xs space-y-1.5 font-mono">
+                <div className="text-zinc-500">Target File Path:</div>
+                <div className="text-zinc-200 font-bold">.branchwatch/registry/nodes/{id}.json</div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(JSON.stringify(buildManifest(), null, 2));
+                    setCopiedPrJson(true);
+                    setTimeout(() => setCopiedPrJson(false), 2000);
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-mono bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white flex items-center gap-1.5"
+                >
+                  {copiedPrJson ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedPrJson ? 'Manifest Copied!' : 'Copy PR Manifest'}</span>
+                </button>
+
+                <a
+                  href={`https://github.com/crycuros/Branchwatch/issues/new?title=[Node+Submission]+${encodeURIComponent(name)}&body=${encodeURIComponent(
+                    `### Custom Node Submission\n\n**Node ID:** \`${id}\`\n**Runtime:** \`${runtime}\`\n**Author:** @${authorName}\n\n\`\`\`json\n${JSON.stringify(
+                      buildManifest(),
+                      null,
+                      2
+                    )}\n\`\`\``
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-zinc-100 text-zinc-950 hover:bg-white inline-flex items-center gap-1.5"
+                >
+                  <span>Open GitHub Submission</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

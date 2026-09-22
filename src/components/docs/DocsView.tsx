@@ -306,10 +306,87 @@ sys.exit(0)`,
     },
   },
 
-  // 7. Starter Recipes
+  // 7. Open-Source Contributions & Community PRs
+  {
+    id: 'community-contributions',
+    category: '7. Open Source & Contributions',
+    title: 'Submitting Nodes to Official Registry',
+    description: 'Learn how to contribute your custom node to the official crycuros/Branchwatch open-source registry.',
+    content: {
+      overview:
+        'BranchWatch is an open-source project. Any developer can submit custom nodes and workflow recipes to the global community registry by creating a Pull Request on GitHub. Once approved, your node becomes installable by developers worldwide with 1 click.',
+      tips: [
+        'Place your node manifest in .branchwatch/registry/nodes/<id>.json in your PR.',
+        'Ensure schemaVersion is set to 1 and all required fields (id, name, runtime, permissions) are present.',
+        'Include clear permission declarations (shell, filesystem, network) and comprehensive descriptions.',
+        'You can use the 1-click "Submit to Community PR" button in Dev Studio to auto-format your submission.',
+      ],
+      codeSnippet: {
+        language: 'bash',
+        filename: 'GitHub PR Workflow',
+        code: `# 1. Fork crycuros/Branchwatch on GitHub
+git clone https://github.com/<your-username>/Branchwatch.git
+cd Branchwatch
+git checkout -b node/my-custom-guard
+
+# 2. Add your node manifest
+cp my-node.json .branchwatch/registry/nodes/my-custom-guard.json
+
+# 3. Commit and open PR
+git add .branchwatch/registry/nodes/
+git commit -m "feat(nodes): add my-custom-guard community node"
+git push origin node/my-custom-guard`,
+      },
+    },
+  },
+  {
+    id: 'stack-detection',
+    category: '7. Open Source & Contributions',
+    title: 'Workspace Stack Auto-Detection',
+    description: 'How BranchWatch automatically inspects repository configuration files to generate custom recipes.',
+    content: {
+      overview:
+        'When you open the Dev Studio, BranchWatch scans your workspace root for known project files (package.json, tsconfig.json, Cargo.toml, pyproject.toml, Dockerfile, prisma/schema.prisma, Makefile). It dynamically generates recommended nodes tailored to your active tools that can be installed to .branchwatch/nodes/ with 1 click.',
+      tips: [
+        'TypeScript / Next.js projects automatically receive a Typecheck Guard node.',
+        'Rust projects receive Cargo Check & Test nodes.',
+        'Python projects receive Pytest regression test nodes.',
+        'Dockerized repos receive Docker build and smoke test nodes.',
+      ],
+    },
+  },
+  {
+    id: 'sdk-reference',
+    category: '8. Extensibility SDK & Helpers',
+    title: 'Extensibility SDK Reference',
+    description: 'Standard helper libraries and wrappers for Node.js, Python, and Shell scripts.',
+    content: {
+      overview:
+        'BranchWatch injects standard environment variables (BW_CURRENT_BRANCH, BW_REPO_PATH, BW_COMMITTED_FILES, BW_AHEAD_COUNT, BW_BEHIND_COUNT) into every running node process. You can use standard SDK snippets to interact with this context.',
+      codeSnippet: {
+        language: 'javascript',
+        filename: 'Node.js SDK Pattern',
+        code: `// Standard BranchWatch Node.js Pattern
+const branch = process.env.BW_CURRENT_BRANCH;
+const repo = process.env.BW_REPO_PATH;
+const files = (process.env.BW_COMMITTED_FILES || '').split(',');
+
+console.log(\`Running validation on branch: \${branch}\`);
+
+// Exit code 0 signals success, exit code 1 halts workflow
+if (files.some(f => f.endsWith('.env'))) {
+  console.error("Security alert: .env file found in commit staging!");
+  process.exit(1);
+}
+
+process.exit(0);`,
+      },
+    },
+  },
+  // 9. Starter Recipes
   {
     id: 'starter-recipes',
-    category: '7. Starter Recipes',
+    category: '9. Starter Recipes',
     title: 'Starter Recipes & Blueprints',
     description: 'Copy-paste ready node manifests for common real-world developer workflows.',
     content: {
