@@ -411,6 +411,47 @@ process.exit(0);`,
       },
     },
   },
+  // 10. Legal & Governance
+  {
+    id: 'terms-and-conditions',
+    category: '10. Legal & Governance',
+    title: 'Terms of Service & Code Execution Disclaimer',
+    description: 'Terms of use, local execution liability disclaimers, and open-source license agreements.',
+    content: {
+      overview:
+        'By using BranchWatch, you acknowledge and agree to these terms governing local execution, security clearances, and open-source community contributions.',
+      tips: [
+        'Local Execution Responsibility: Custom nodes execute code directly on your local system under your operating system user account. Always review unvetted community scripts before approving permissions.',
+        'Zero Remote Push Guarantee: BranchWatch will never execute destructive remote push commands (git push --force, git push origin) without explicit user intervention.',
+        'Open-Source Licensing: The BranchWatch platform is licensed under the MIT License. Community nodes and recipes shared to the registry are open-source under MIT or their declared SPDX license.',
+        'No Warranty: BranchWatch is provided "AS IS", without warranty of any kind, express or implied, including fitness for a particular purpose.',
+      ],
+      codeSnippet: {
+        language: 'text',
+        filename: 'MIT License Summary',
+        code: `Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files, to deal in the Software
+without restriction, including without limitation the rights to use, copy,
+modify, merge, publish, distribute, sublicense, and/or sell copies.`,
+      },
+    },
+  },
+  {
+    id: 'privacy-security-policy',
+    category: '10. Legal & Governance',
+    title: 'Privacy & Data Security Policy',
+    description: 'How BranchWatch protects your local source code, credentials, and git history.',
+    content: {
+      overview:
+        'BranchWatch is built with a zero-telemetry, offline-first philosophy. Your code and credentials never leave your machine unless explicitly configured.',
+      tips: [
+        'Local-Only Storage: All git graphs, branch diffs, commit histories, and node definitions are stored in your local browser and workspace filesystem.',
+        'GitHub PAT Protection: Personal Access Tokens are stored strictly in your browser client-side storage (localStorage / memory) and are only sent directly to official api.github.com endpoints.',
+        'No Third-Party Tracking: BranchWatch does not bundle third-party tracking scripts, analytics cookies, or behavioral telemetry.',
+        'Webhook Data Flow: If you configure Webhook nodes, data is transmitted strictly to the URLs you specify.',
+      ],
+    },
+  },
 ];
 
 export const DocsView: React.FC<{

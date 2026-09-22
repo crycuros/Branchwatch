@@ -166,6 +166,16 @@ export const AppShell: React.FC<AppShellProps> = ({
               </div>
             </div>
           </button>
+
+          <div className="px-3.5 pt-1.5 flex items-center justify-between text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">
+            <button
+              onClick={() => onTabChange('docs')}
+              className="hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
+            >
+              Terms & Privacy
+            </button>
+            <span>MIT License</span>
+          </div>
         </div>
       </aside>
 
