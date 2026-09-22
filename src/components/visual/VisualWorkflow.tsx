@@ -16,7 +16,7 @@ import {
   FolderGit2, FileCode, GitCommit, GitBranch, Download, Upload,
   Layers, Maximize2, Minimize2, Terminal as TerminalIcon, X,
   GitBranch as LogoIcon, Info, Play, CheckCircle2, AlertTriangle, XCircle, RefreshCw,
-  Globe, BookOpen, Edit3, GitFork, ArrowRight,
+  Globe, BookOpen, Edit3, GitFork, ArrowRight, ArrowLeft,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -643,13 +643,35 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-3 border-b border-neutral-200/60 dark:border-neutral-800/70 flex-shrink-0">
         <div className="space-y-1.5">
+          {initialWorkflow && onOpenCommunity && (
+            <div className="flex items-center gap-2 mb-1">
+              <button
+                onClick={onOpenCommunity}
+                className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors font-medium"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Community Hub</span>
+              </button>
+              <span className="text-neutral-400 dark:text-neutral-600">/</span>
+              <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                {initialWorkflow.title}
+              </span>
+            </div>
+          )}
+
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-              Visual Git Workflow
+              {initialWorkflow ? initialWorkflow.title : 'Visual Git Workflow'}
             </h1>
             <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-medium">
-              V2 Engine
+              {initialWorkflow ? 'Community Recipe' : 'V2 Engine'}
             </span>
+
+            {initialWorkflow && (
+              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 font-mono">
+                <span>by @{initialWorkflow.author.login}</span>
+              </div>
+            )}
 
             {forkMeta && (
               <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-[11px] text-neutral-600 dark:text-neutral-400 font-mono">
@@ -660,7 +682,10 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            <BranchContextBar />
+            <div className="text-xs text-neutral-400 flex items-center gap-1.5">
+              <span>Target Repo:</span>
+              <BranchContextBar />
+            </div>
           </div>
         </div>
 
