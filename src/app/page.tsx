@@ -471,6 +471,7 @@ export default function Home() {
               onForkWorkflowToCanvas={handleForkCommunityWorkflow}
               onOpenPublishModal={() => setActiveTab('visual')}
               onOpenDiscussions={(wf) => setSelectedDiscussionsWorkflow(wf)}
+              onOpenDevStudio={() => setActiveTab('developer')}
             />
           </div>
         )}

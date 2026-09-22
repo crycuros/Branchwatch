@@ -13,6 +13,7 @@ import {
   Loader2,
   Box,
   Layers,
+  Code2,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { checkUserStarredRepo, starRepositoryOnGitHub, unstarRepositoryOnGitHub } from '@/lib/github';
@@ -23,6 +24,7 @@ interface CommunityHubProps {
   onForkWorkflowToCanvas: (workflow: CommunityWorkflow) => void;
   onOpenPublishModal: () => void;
   onOpenDiscussions: (workflow: CommunityWorkflow) => void;
+  onOpenDevStudio?: () => void;
 }
 
 const CATEGORIES: { id: WorkflowCategory; label: string }[] = [
@@ -47,6 +49,7 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
   onForkWorkflowToCanvas,
   onOpenPublishModal,
   onOpenDiscussions,
+  onOpenDevStudio,
 }) => {
   const [hubView, setHubView] = useState<'workflows' | 'plugins'>('workflows');
   const [workflows, setWorkflows] = useState<CommunityWorkflow[]>([]);
@@ -207,6 +210,18 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
             )}
           </button>
 
+          {onOpenDevStudio && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenDevStudio}
+              className="text-xs font-semibold"
+            >
+              <Code2 className="w-3.5 h-3.5" />
+              <span>Dev Studio</span>
+            </Button>
+          )}
+
           {hubView === 'workflows' && (
             <Button variant="primary" size="sm" onClick={onOpenPublishModal}>
               <Plus className="w-3.5 h-3.5" />
@@ -218,7 +233,7 @@ export const CommunityHub: React.FC<CommunityHubProps> = ({
 
       {/* Conditionally Render Plugins Marketplace */}
       {hubView === 'plugins' ? (
-        <PluginMarketplace />
+        <PluginMarketplace onOpenDevStudio={onOpenDevStudio} />
       ) : (
         <>
           {/* Featured Section */}
