@@ -4,7 +4,7 @@ import {
   FolderGit2, FileCode, GitCommit, GitBranch, Download, Upload,
   CheckCircle2, Clock, AlertCircle, Loader2, Circle, ExternalLink,
   ArrowUp, ArrowDown, Files, GitCompare, Archive, GitMerge, Tag,
-  GitPullRequest, Trash2, Settings2, Box,
+  GitPullRequest, Trash2, Settings2, Box, Terminal, Shield, Globe,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
@@ -51,6 +51,10 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
     Trash2,
     Settings2,
     Box,
+    Terminal,
+    Shield,
+    ShieldCheck: Shield,
+    Globe,
   };
 
   const Icon = (node.config.pluginIcon && PLUGIN_ICON_MAP[node.config.pluginIcon]) || nodeIcons[node.type] || GitCommit;
@@ -80,6 +84,12 @@ export const GitNodeCard: React.FC<GitNodeCardProps> = ({
         return (
           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
             <AlertCircle className="w-3 h-3" /> Failed
+          </span>
+        );
+      case 'skipped':
+        return (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-400 bg-neutral-800 px-2 py-0.5 rounded-full border border-neutral-700">
+            Skipped
           </span>
         );
       default:

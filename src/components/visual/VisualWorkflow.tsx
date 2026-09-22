@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { WorkflowNode, NodeConnection, NodeType, ExecutionStep, WorkflowValidationIssue } from '@/lib/workflowTypes';
+import { WorkflowNode, NodeConnection, NodeType, ExecutionStep, WorkflowValidationIssue, WorkflowExecutionEvent } from '@/lib/workflowTypes';
 import { generateGitCommands, buildNodesFromRepoData } from '@/lib/workflowGenerator';
 import { validateWorkflowGraph, validateConnection } from '@/lib/nodeValidation';
 import { generateExecutionPlan, executeStep } from '@/lib/workflowExecutor';
@@ -12,15 +12,17 @@ import { TerminalPreview } from './TerminalPreview';
 import { NodeInspector } from './NodeInspector';
 import { NodeContextMenu } from './NodeContextMenu';
 import { WorkflowPublishModal } from '../community/WorkflowPublishModal';
+import { TerminalDrawer } from './TerminalDrawer';
 
 import { PluginNodeDefinition } from '@/lib/pluginTypes';
 import { getInstalledPlugins } from '@/lib/pluginStorage';
 import { PluginEditorModal } from '../plugins/PluginEditorModal';
+import { PermissionModal } from '../plugins/PermissionModal';
 
 import {
   Plus, Minus, RotateCcw, Save, Undo, Redo,
   FolderGit2, FileCode, GitCommit, GitBranch, Download, Upload,
-  Layers, Maximize2, Minimize2, Terminal as TerminalIcon, X,
+  Layers, Maximize2, Minimize2, Terminal, Shield, X,
   GitBranch as LogoIcon, Info, Play, CheckCircle2, AlertTriangle, XCircle, RefreshCw,
   Globe, BookOpen, Edit3, GitFork, ArrowRight, ArrowLeft, ExternalLink, Sparkles,
   Archive, GitMerge, Tag, GitPullRequest, Trash2, Settings2, Box,
@@ -94,15 +96,35 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
 
   // Plugin Studio & Extensible Nodes
   const [installedPlugins, setInstalledPlugins] = useState<PluginNodeDefinition[]>([]);
+  const [workspacePlugins, setWorkspacePlugins] = useState<PluginNodeDefinition[]>([]);
   const [isPluginStudioOpen, setIsPluginStudioOpen] = useState(false);
+
+  // Security & Clearance State
+  const [permissionNodeToAuthorize, setPermissionNodeToAuthorize] = useState<WorkflowNode | null>(null);
+  const [trustedNodeIds, setTrustedNodeIds] = useState<Set<string>>(new Set());
+
+  // Terminal Drawer & Live Stream Events
+  const [executionEvents, setExecutionEvents] = useState<WorkflowExecutionEvent[]>([]);
+  const [isTerminalDrawerOpen, setIsTerminalDrawerOpen] = useState(false);
 
   const reloadPlugins = useCallback(() => {
     setInstalledPlugins(getInstalledPlugins());
   }, []);
 
+  const scanWorkspacePlugins = useCallback(async () => {
+    try {
+      const res = await fetch('/api/git/scan-plugins');
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspacePlugins(data.plugins || []);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     reloadPlugins();
-  }, [reloadPlugins]);
+    scanWorkspacePlugins();
+  }, [reloadPlugins, scanWorkspacePlugins]);
 
   // Workflow Execution State
   const [runMode, setRunMode] = useState<WorkflowRunMode>('idle');
@@ -112,6 +134,35 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
   const [showValidation, setShowValidation] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const [localGitStatus, setLocalGitStatus] = useState<LocalGitStatus | null>(null);
+
+  const fetchBranchDetails = useCallback(async (bName: string, base: string = 'main', targetNodeId?: string) => {
+    try {
+      const bRes = await fetch(`/api/git/branch-info?branch=${encodeURIComponent(bName)}&base=${encodeURIComponent(base)}`);
+      if (bRes.ok) {
+        const bData = await bRes.json();
+        setNodes((currentNodes) =>
+          currentNodes.map((n) =>
+            (targetNodeId ? n.id === targetNodeId : n.type === 'branch' && (n.config.branchName || currentBranchName) === bName)
+              ? {
+                  ...n,
+                  config: {
+                    ...n.config,
+                    aheadBy: bData.ahead,
+                    behindBy: bData.behind,
+                    baseBranchName: bData.baseBranch,
+                    availableBranches: bData.availableBranches,
+                    branchCommits: bData.commits,
+                    branchFiles: bData.files,
+                    additions: bData.totalAdditions,
+                    deletions: bData.totalDeletions,
+                  },
+                }
+              : n
+          )
+        );
+      }
+    } catch {}
+  }, [currentBranchName]);
 
   const refreshLocalGitStatus = useCallback(async () => {
     try {
@@ -138,41 +189,19 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
       }
     } catch {}
 
-    // Also sync ahead/behind and committed files for all branch nodes
+    // Also sync ahead/behind and full branch commit stack for all branch nodes
     try {
       setNodes((prev) => {
         const branchNodes = prev.filter((n) => n.type === 'branch');
-        branchNodes.forEach(async (bn) => {
+        branchNodes.forEach((bn) => {
           const bName = bn.config.branchName || currentBranchName || 'main';
-          try {
-            const bRes = await fetch(`/api/git/branch-info?branch=${encodeURIComponent(bName)}&base=main`);
-            if (bRes.ok) {
-              const bData = await bRes.json();
-              setNodes((currentNodes) =>
-                currentNodes.map((n) =>
-                  n.id === bn.id
-                    ? {
-                        ...n,
-                        config: {
-                          ...n.config,
-                          aheadBy: bData.ahead,
-                          behindBy: bData.behind,
-                          baseBranchName: bData.baseBranch,
-                          branchFiles: bData.files,
-                          additions: bData.totalAdditions,
-                          deletions: bData.totalDeletions,
-                        },
-                      }
-                    : n
-                )
-              );
-            }
-          } catch {}
+          const base = bn.config.baseBranchName || 'main';
+          fetchBranchDetails(bName, base, bn.id);
         });
         return prev;
       });
     } catch {}
-  }, [currentBranchName]);
+  }, [currentBranchName, fetchBranchDetails]);
 
   useEffect(() => {
     refreshLocalGitStatus();
@@ -445,8 +474,23 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
 
   // Run Workflow — Step 2: Execute plan
   const handleConfirmExecute = async () => {
+    // Check for unvetted custom nodes requiring permission clearance
+    const unapprovedNode = nodes.find(
+      (n) =>
+        n.type === 'plugin' &&
+        (n.config.permissions?.shell || n.config.permissions?.network) &&
+        !trustedNodeIds.has(n.config.pluginId || n.id)
+    );
+
+    if (unapprovedNode) {
+      setPermissionNodeToAuthorize(unapprovedNode);
+      setRunMode('idle');
+      return;
+    }
+
     setRunMode('executing');
     setExecutionResult(null);
+    setIsTerminalDrawerOpen(true);
 
     // Live Execution directly against GitHub REST API
     if (token && repoFullName) {
@@ -505,8 +549,9 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
       }
     }
 
-    // Fallback: Simulation for unauthenticated demo
+    // Process Runner with Event Bus Streaming & Context Chaining
     let currentPlan = [...executionPlan];
+    let contextOutputs: Record<string, any> = {};
 
     for (let i = 0; i < currentPlan.length; i++) {
       currentPlan = currentPlan.map((s, idx) =>
@@ -515,39 +560,63 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
       setExecutionPlan([...currentPlan]);
 
       setNodes((prev) =>
-        prev.map((n) => n.id === currentPlan[i].nodeId ? { ...n, status: 'executing' } : n)
+        prev.map((n) => (n.id === currentPlan[i].nodeId ? { ...n, status: 'executing' } : n))
       );
 
+      const targetNode = nodes.find((n) => n.id === currentPlan[i].nodeId);
+      if (!targetNode) continue;
+
       try {
-        const result = await executeStep(currentPlan[i], (nodeId, status, output, sha) => {
-          setNodes((prev) =>
-            prev.map((n) =>
-              n.id === nodeId
-                ? {
-                    ...n,
-                    status,
-                    config: {
-                      ...n.config,
-                      ...(sha ? { sha } : {}),
-                      ...(output ? { executionLog: { output, completedAt: new Date().toISOString() } } : {}),
-                    },
-                  }
-                : n
-            )
-          );
-        });
+        const result = await executeStep(
+          currentPlan[i],
+          targetNode,
+          {
+            branch: targetNode.config.branchName || currentBranchName,
+            baseBranch: targetNode.config.baseBranchName || 'main',
+            ahead: targetNode.config.aheadBy,
+            behind: targetNode.config.behindBy,
+            committedFiles: targetNode.config.branchFiles,
+            contextOutputs,
+          },
+          (nodeId, status, output, sha, outputs) => {
+            if (outputs) contextOutputs[nodeId] = outputs;
+            setNodes((prev) =>
+              prev.map((n) =>
+                n.id === nodeId
+                  ? {
+                      ...n,
+                      status,
+                      config: {
+                        ...n.config,
+                        ...(sha ? { sha } : {}),
+                        ...(output ? { executionLog: { output, completedAt: new Date().toISOString() } } : {}),
+                      },
+                    }
+                  : n
+              )
+            );
+          },
+          (event) => {
+            setExecutionEvents((prev) => [...prev, event]);
+          }
+        );
 
         currentPlan = currentPlan.map((s, idx) =>
-          idx === i ? { ...result, status: 'success' as const } : s
+          idx === i ? { ...result, status: (result.status || 'success') as any } : s
         );
         setExecutionPlan([...currentPlan]);
+
+        // Halt on failure if node config is not set to continue
+        if (result.status === 'failed' && targetNode.config.onFailure !== 'continue') {
+          break;
+        }
       } catch (err) {
         currentPlan = currentPlan.map((s, idx) =>
           idx === i ? { ...s, status: 'failed' as const, error: String(err) } : s
         );
         setExecutionPlan([...currentPlan]);
         setNodes((prev) =>
-          prev.map((n) => n.id === currentPlan[i].nodeId ? { ...n, status: 'failed' } : n)
+          prev.map((n) => (n.id === currentPlan[i].nodeId ? { ...n, status: 'failed' } : n))
         );
         break;
       }
@@ -723,7 +792,7 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
               <Info className="w-4 h-4" /> Inspector
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowTerminal(!showTerminal)} className={showTerminal ? 'bg-neutral-800 text-white' : 'text-neutral-400'}>
-              <TerminalIcon className="w-4 h-4" /> Terminal
+              <Terminal className="w-4 h-4" /> Terminal
             </Button>
             <Button variant="primary" size="sm" onClick={() => setIsFullscreen(false)}>
               <Minimize2 className="w-4 h-4" /> Exit
@@ -740,7 +809,8 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
               </div>
               <NodeLibraryList
                 onAddNode={handleAddNode}
-                plugins={installedPlugins}
+                installedPlugins={installedPlugins}
+                workspacePlugins={workspacePlugins}
                 onOpenPluginStudio={() => setIsPluginStudioOpen(true)}
                 dark
               />
@@ -1041,7 +1111,8 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
               </div>
               <NodeLibraryList
                 onAddNode={handleAddNode}
-                plugins={installedPlugins}
+                installedPlugins={installedPlugins}
+                workspacePlugins={workspacePlugins}
                 onOpenPluginStudio={() => setIsPluginStudioOpen(true)}
               />
             </div>
@@ -1086,6 +1157,7 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
               onDeleteNode={handleDeleteNode}
               onExecuteAction={handleExecuteAction}
               onUpdateConfig={handleUpdateConfig}
+              onBaseBranchChange={(bName, base) => fetchBranchDetails(bName, base)}
               onCloseInspector={() => setSelectedNodeId(null)}
             />
           </div>
@@ -1191,6 +1263,34 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
         </div>
       )}
 
+      {/* Permission Security Clearance Modal */}
+      {permissionNodeToAuthorize && (
+        <PermissionModal
+          isOpen={!!permissionNodeToAuthorize}
+          node={permissionNodeToAuthorize}
+          onAuthorize={(scope) => {
+            const idToTrust =
+              permissionNodeToAuthorize.config.pluginId || permissionNodeToAuthorize.id;
+            setTrustedNodeIds((prev) => new Set([...prev, idToTrust]));
+            setPermissionNodeToAuthorize(null);
+            setTimeout(() => handleConfirmExecute(), 100);
+          }}
+          onCancel={() => {
+            setPermissionNodeToAuthorize(null);
+            setRunMode('idle');
+          }}
+        />
+      )}
+
+      {/* Terminal Output & Execution Drawer */}
+      <TerminalDrawer
+        isOpen={isTerminalDrawerOpen}
+        onToggle={() => setIsTerminalDrawerOpen(!isTerminalDrawerOpen)}
+        events={executionEvents}
+        onClear={() => setExecutionEvents([])}
+        isExecuting={runMode === 'executing'}
+      />
+
       {/* Publish to Community Modal */}
       <WorkflowPublishModal
         isOpen={showPublishModal}
@@ -1223,14 +1323,17 @@ export const VisualWorkflow: React.FC<VisualWorkflowProps> = ({
         <PluginEditorModal
           isOpen={isPluginStudioOpen}
           onClose={() => setIsPluginStudioOpen(false)}
-          onPluginSaved={() => reloadPlugins()}
+          onPluginSaved={() => {
+            reloadPlugins();
+            scanWorkspacePlugins();
+          }}
         />
       )}
     </div>
   );
 };
 
-// Shared Node Library button list
+// Shared Node Library button list with 3-Tier Hierarchy
 const NODE_LIBRARY_ITEMS: { type: NodeType; label: string; Icon: React.FC<{ className?: string }> }[] = [
   { type: 'working_tree', label: 'Working Tree', Icon: FolderGit2 },
   { type: 'stage', label: 'Stage', Icon: FileCode },
@@ -1248,87 +1351,168 @@ const PLUGIN_ICONS: Record<string, React.FC<{ className?: string }>> = {
   Trash2,
   Settings2,
   Box,
+  Terminal,
+  Shield,
+  ShieldCheck: Shield,
+  Globe,
 };
 
 interface NodeLibraryListProps {
   onAddNode: (type: NodeType, pluginDef?: PluginNodeDefinition) => void;
-  plugins: PluginNodeDefinition[];
+  installedPlugins: PluginNodeDefinition[];
+  workspacePlugins: PluginNodeDefinition[];
   onOpenPluginStudio: () => void;
   dark?: boolean;
 }
 
 const NodeLibraryList: React.FC<NodeLibraryListProps> = ({
   onAddNode,
-  plugins = [],
+  installedPlugins = [],
+  workspacePlugins = [],
   onOpenPluginStudio,
   dark,
-}) => (
-  <div className="space-y-4 text-xs">
-    {/* Core Git Nodes */}
-    <div className="space-y-1.5">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-1">
-        Core Git
-      </div>
-      {NODE_LIBRARY_ITEMS.map(({ type, label, Icon }) => (
-        <button
-          key={type}
-          onClick={() => onAddNode(type)}
-          className={`w-full flex items-center gap-2.5 p-2 rounded-xl border transition-colors font-medium ${
-            dark
-              ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
-              : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
-          }`}
-        >
-          <Icon className={`w-3.5 h-3.5 ${dark ? 'text-neutral-400' : 'text-neutral-500'}`} />
-          <span>{label}</span>
-        </button>
-      ))}
-    </div>
+}) => {
+  const localPlugins = installedPlugins.filter((p) => p.source === 'local');
+  const communityPlugins = installedPlugins.filter((p) => p.source !== 'local');
 
-    {/* Community Plugins */}
-    {plugins.length > 0 && (
-      <div className="space-y-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-            Community Nodes
-          </span>
-          <span className="text-[9px] font-mono text-neutral-500">{plugins.length}</span>
+  return (
+    <div className="space-y-4 text-xs">
+      {/* 1. This Repository (.branchwatch/nodes/) */}
+      {workspacePlugins.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1">
+              <span>This Repository</span>
+            </span>
+            <span className="text-[9px] font-mono text-neutral-500">{workspacePlugins.length}</span>
+          </div>
+
+          {workspacePlugins.map((plugin) => {
+            const Icon = PLUGIN_ICONS[plugin.iconName] || Box;
+            return (
+              <button
+                key={plugin.id}
+                onClick={() => onAddNode('plugin', plugin)}
+                className={`w-full flex items-center justify-between p-2 rounded-xl border transition-colors font-medium ${
+                  dark
+                    ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
+                    : 'border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 text-neutral-800 dark:text-neutral-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0 text-emerald-500" />
+                  <span className="truncate">{plugin.name}</span>
+                </div>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  repo
+                </span>
+              </button>
+            );
+          })}
         </div>
+      )}
 
-        {plugins.map((plugin) => {
-          const Icon = PLUGIN_ICONS[plugin.iconName] || Box;
-          return (
-            <button
-              key={plugin.id}
-              onClick={() => onAddNode('plugin', plugin)}
-              className={`w-full flex items-center justify-between p-2 rounded-xl border transition-colors font-medium ${
-                dark
-                  ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
-                  : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
-              }`}
-            >
-              <div className="flex items-center gap-2 truncate">
-                <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${dark ? 'text-sky-400' : 'text-sky-500'}`} />
-                <span className="truncate">{plugin.name}</span>
-              </div>
-              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                ext
-              </span>
-            </button>
-          );
-        })}
+      {/* 2. My Local Custom Nodes */}
+      {localPlugins.length > 0 && (
+        <div className="space-y-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+              My Nodes
+            </span>
+            <span className="text-[9px] font-mono text-neutral-500">{localPlugins.length}</span>
+          </div>
+
+          {localPlugins.map((plugin) => {
+            const Icon = PLUGIN_ICONS[plugin.iconName] || Box;
+            return (
+              <button
+                key={plugin.id}
+                onClick={() => onAddNode('plugin', plugin)}
+                className={`w-full flex items-center justify-between p-2 rounded-xl border transition-colors font-medium ${
+                  dark
+                    ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
+                    : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0 text-purple-400" />
+                  <span className="truncate">{plugin.name}</span>
+                </div>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  custom
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 3. Core Git Nodes */}
+      <div className="space-y-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 px-1">
+          Core Git
+        </div>
+        {NODE_LIBRARY_ITEMS.map(({ type, label, Icon }) => (
+          <button
+            key={type}
+            onClick={() => onAddNode(type)}
+            className={`w-full flex items-center gap-2.5 p-2 rounded-xl border transition-colors font-medium ${
+              dark
+                ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
+                : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
+            }`}
+          >
+            <Icon className={`w-3.5 h-3.5 ${dark ? 'text-neutral-400' : 'text-neutral-500'}`} />
+            <span>{label}</span>
+          </button>
+        ))}
       </div>
-    )}
 
-    {/* Custom Node Studio Shortcut */}
-    <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800">
-      <button
-        onClick={onOpenPluginStudio}
-        className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs transition-opacity hover:opacity-90 shadow-sm"
-      >
-        <Sparkles className="w-3.5 h-3.5" />
-        <span>+ Custom Node</span>
-      </button>
+      {/* 4. Community Plugins */}
+      {communityPlugins.length > 0 && (
+        <div className="space-y-1.5 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+              Community & Addons
+            </span>
+            <span className="text-[9px] font-mono text-neutral-500">{communityPlugins.length}</span>
+          </div>
+
+          {communityPlugins.map((plugin) => {
+            const Icon = PLUGIN_ICONS[plugin.iconName] || Box;
+            return (
+              <button
+                key={plugin.id}
+                onClick={() => onAddNode('plugin', plugin)}
+                className={`w-full flex items-center justify-between p-2 rounded-xl border transition-colors font-medium ${
+                  dark
+                    ? 'border-neutral-800 hover:bg-neutral-800 text-neutral-200'
+                    : 'border-neutral-200/60 dark:border-neutral-800/80 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-800 dark:text-neutral-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0 text-sky-400" />
+                  <span className="truncate">{plugin.name}</span>
+                </div>
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  addon
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Custom Node Studio Shortcut */}
+      <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800">
+        <button
+          onClick={onOpenPluginStudio}
+          className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs transition-opacity hover:opacity-90 shadow-sm"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>+ Script Studio</span>
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};

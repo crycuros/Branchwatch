@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "branchwatch.typecheck-guard",
+  "name": "TypeCheck & Lint Guard",
+  "version": "1.0.0",
+  "description": "Runs TypeScript compilation check before allowing changes to merge or push.",
+  "author": {
+    "name": "BranchWatch Core Team"
+  },
+  "homepage": "https://github.com/crycuros/Branchwatch",
+  "tags": ["typescript", "testing", "guard", "ci"],
+  "platforms": ["windows", "linux", "darwin"],
+  "iconName": "ShieldCheck",
+  "category": "testing",
+  "runtime": "shell",
+  "permissions": {
+    "filesystem": "workspace",
+    "git": false,
+    "shell": true,
+    "network": false
+  },
+  "inputPort": {
+    "type": "CommitRef",
+    "label": "Verified Commit"
+  },
+  "outputPort": {
+    "type": "BranchRef",
+    "label": "Passed Code"
+  },
+  "configSchema": [
+    {
+      "key": "typecheckCmd",
+      "label": "Typecheck Command",
+      "type": "text",
+      "defaultValue": "npx tsc --noEmit",
+      "placeholder": "npx tsc --noEmit or npm test",
+      "required": true
+    }
+  ],
+  "commandTemplate": "npx tsc --noEmit",
+  "inputs": {
+    "branch": "{{BRANCH}}"
+  },
+  "outputs": {
+    "exitCode": "$EXIT_CODE",
+    "stdout": "$STDOUT",
+    "stderr": "$STDERR"
+  },
+  "onFailure": "halt",
+  "source": "workspace"
+}

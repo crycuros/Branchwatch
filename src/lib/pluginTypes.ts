@@ -1,6 +1,6 @@
-import { PortDataType } from './workflowTypes';
+import { PortDataType, NodePermissions, WebhookConfig } from './workflowTypes';
 
-export type PluginCategory = 'git' | 'automation' | 'notification' | 'security' | 'custom';
+export type PluginCategory = 'git' | 'automation' | 'testing' | 'notification' | 'security' | 'devops' | 'custom';
 
 export type ConfigFieldType = 'text' | 'textarea' | 'number' | 'checkbox' | 'select';
 
@@ -15,18 +15,28 @@ export interface ConfigFieldSchema {
   required?: boolean;
 }
 
+export type PluginRuntime = 'shell' | 'nodejs' | 'python' | 'webhook';
+
 export interface PluginNodeDefinition {
-  id: string; // e.g. "plugin-stash", "plugin-rebase-sync"
+  schemaVersion: 1;
+  id: string; // e.g. "my-project.typecheck", "team.docker-build"
   name: string;
   version: string;
   description: string;
   author: {
     name: string;
-    login: string;
+    login?: string;
     avatar_url?: string;
   };
-  iconName: string; // Lucide icon identifier: 'Archive', 'GitMerge', 'Tag', 'Trash2', 'GitPullRequest', etc.
+  homepage?: string;
+  tags?: string[];
+  platforms?: ('windows' | 'linux' | 'darwin')[];
+  iconName: string; // Lucide icon identifier
   category: PluginCategory;
+  
+  runtime: PluginRuntime;
+  permissions: NodePermissions;
+  
   inputPort: {
     type: PortDataType;
     label: string;
@@ -35,8 +45,24 @@ export interface PluginNodeDefinition {
     type: PortDataType;
     label: string;
   };
+  
   configSchema: ConfigFieldSchema[];
-  commandTemplate: string; // e.g. "git stash push -m \"{{message}}\"" or "git tag -a {{version}} -m \"{{notes}}\""
+  
+  // Script configuration
+  commandTemplate?: string;
+  scriptContent?: string;
+  timeoutMs?: number;
+  
+  // Webhook configuration
+  webhookConfig?: WebhookConfig;
+  
+  // Composable Inputs & Outputs
+  inputs?: Record<string, string>;
+  outputs?: Record<string, string>;
+  
+  onFailure?: 'halt' | 'continue';
+  source?: 'workspace' | 'local' | 'community';
+  
   documentationUrl?: string;
   isOfficial?: boolean;
   installed?: boolean;

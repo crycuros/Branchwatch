@@ -1,5 +1,5 @@
 export type NodeType = 'working_tree' | 'stage' | 'commit' | 'branch' | 'pull' | 'push' | 'plugin';
-export type NodeStatusType = 'draft' | 'ready' | 'executing' | 'success' | 'failed';
+export type NodeStatusType = 'draft' | 'ready' | 'executing' | 'success' | 'failed' | 'skipped';
 
 // Typed port system — each port has a semantic data type
 export type PortDataType =
@@ -57,6 +57,37 @@ export interface ExecutionLogEntry {
   command?: string;
   output?: string;
   error?: string;
+  exitCode?: number;
+  httpStatus?: number;
+  rawResponse?: any;
+}
+
+export interface BranchCommitEntry {
+  sha: string;
+  message: string;
+  author: string;
+  date: string;
+}
+
+export interface NodePermissions {
+  filesystem?: 'none' | 'workspace' | 'all';
+  network?: boolean;
+  git?: boolean;
+  shell?: boolean;
+}
+
+export interface NodeCondition {
+  sourceNodeId: string;
+  field: 'exitCode' | 'stdout' | 'status' | string;
+  operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'is_truthy';
+  value: any;
+}
+
+export interface WebhookConfig {
+  url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  headers?: Record<string, string>;
+  bodyTemplate?: string;
 }
 
 export interface WorkflowNodeConfig {
@@ -76,6 +107,8 @@ export interface WorkflowNodeConfig {
   aheadBy?: number;
   behindBy?: number;
   baseBranchName?: string;
+  availableBranches?: string[];
+  branchCommits?: BranchCommitEntry[];
   branchFiles?: {
     path: string;
     status: 'added' | 'modified' | 'deleted' | 'renamed';
@@ -85,6 +118,16 @@ export interface WorkflowNodeConfig {
   pluginId?: string;
   pluginName?: string;
   pluginIcon?: string;
+  pluginSource?: 'workspace' | 'local' | 'community';
+  runtime?: 'builtin' | 'shell' | 'nodejs' | 'python' | 'webhook';
+  permissions?: NodePermissions;
+  scriptContent?: string;
+  timeoutMs?: number;
+  inputs?: Record<string, string>;
+  outputs?: Record<string, string>;
+  webhookConfig?: WebhookConfig;
+  onFailure?: 'halt' | 'continue';
+  condition?: NodeCondition;
   inputPortType?: PortDataType;
   outputPortType?: PortDataType;
   customParams?: Record<string, any>;
@@ -106,6 +149,7 @@ export interface NodeConnection {
   id: string;
   fromId: string;
   toId: string;
+  condition?: NodeCondition;
 }
 
 export interface WorkflowValidationIssue {
@@ -129,7 +173,22 @@ export interface ExecutionStep {
   command: string;
   description: string;
   isDangerous?: boolean;
-  status: 'queued' | 'executing' | 'success' | 'failed';
+  status: 'queued' | 'executing' | 'success' | 'failed' | 'skipped';
   output?: string;
   error?: string;
+  exitCode?: number;
+  durationMs?: number;
+  outputs?: Record<string, any>;
+}
+
+export interface WorkflowExecutionEvent {
+  type: 'start' | 'stdout' | 'stderr' | 'exit' | 'http_response' | 'error' | 'skipped';
+  nodeId: string;
+  nodeTitle: string;
+  data: string;
+  timestamp: string;
+  exitCode?: number;
+  status?: number;
+  durationMs?: number;
+  outputs?: Record<string, any>;
 }
