@@ -30,7 +30,7 @@ import { WorkflowDiscussions } from '@/components/community/WorkflowDiscussions'
 import { CommunityWorkflow } from '@/lib/communityTypes';
 import { incrementForkCount, setCurrentUser } from '@/lib/communityStorage';
 import { DeveloperDashboard } from '@/components/developer/DeveloperDashboard';
-import { GitBookDocs } from '@/components/docs/GitBookDocs';
+import { DocsView } from '@/components/docs/DocsView';
 import { ShieldCheck, Github } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -485,10 +485,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* TAB 6: GITBOOK-STYLE DOCUMENTATION */}
+        {/* TAB 6: DOCUMENTATION */}
         {activeTab === 'docs' && (
           <div className="animate-fade-in w-full h-full min-h-0 flex-1 flex flex-col overflow-hidden">
-            <GitBookDocs
+            <DocsView
               onOpenStudio={() => setActiveTab('developer')}
               onOpenWorkflow={() => setActiveTab('visual')}
             />

@@ -336,7 +336,7 @@ sys.exit(0)`,
   },
 ];
 
-export const GitBookDocs: React.FC<{
+export const DocsView: React.FC<{
   onOpenStudio: () => void;
   onOpenWorkflow: () => void;
 }> = ({ onOpenStudio, onOpenWorkflow }) => {
@@ -369,7 +369,7 @@ export const GitBookDocs: React.FC<{
 
   return (
     <div className="h-full w-full flex flex-col md:flex-row overflow-hidden bg-neutral-100/50 dark:bg-[#09090b] text-neutral-900 dark:text-neutral-100 font-sans">
-      {/* GitBook Style Sidebar */}
+      {/* Docs Sidebar */}
       <aside className="w-full md:w-72 h-auto md:h-full border-b md:border-b-0 md:border-r border-neutral-200 dark:border-neutral-800 bg-white/60 dark:bg-neutral-950/40 backdrop-blur-xl p-4 flex flex-col justify-between flex-shrink-0 overflow-y-auto no-scrollbar">
         <div className="space-y-4">
           {/* Header */}

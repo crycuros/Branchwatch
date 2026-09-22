@@ -55,7 +55,7 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   const devNavItems = [
     { id: 'developer' as NavTab, label: 'Dev Studio', icon: Code2, badge: 'Dev' },
-    { id: 'docs' as NavTab, label: 'Documentation', icon: BookOpen },
+    { id: 'docs' as NavTab, label: 'Docs', icon: BookOpen },
   ];
 
   return (
