@@ -24,12 +24,13 @@ interface CommunityHubProps {
 
 const CATEGORIES: { id: WorkflowCategory; label: string }[] = [
   { id: 'all', label: 'All Workflows' },
-  { id: 'basics', label: 'Git Basics' },
-  { id: 'feature', label: 'Feature Development' },
-  { id: 'hotfix', label: 'Hotfix & Patch' },
+  { id: 'enterprise', label: 'Big Tech & Enterprise' },
+  { id: 'startup', label: 'Startup & Agile Teams' },
+  { id: 'casual', label: 'Casual & Solo Devs' },
   { id: 'opensource', label: 'Open Source' },
-  { id: 'release', label: 'Release' },
+  { id: 'hotfix', label: 'Emergency Hotfix' },
   { id: 'monorepo', label: 'Monorepo' },
+  { id: 'basics', label: 'Git Basics' },
 ];
 
 type SortOption = 'stars' | 'forks' | 'used' | 'newest';

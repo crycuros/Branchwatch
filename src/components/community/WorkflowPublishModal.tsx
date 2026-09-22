@@ -184,12 +184,13 @@ export const WorkflowPublishModal: React.FC<WorkflowPublishModalProps> = ({
                   aria-label="Workflow Category"
                   className="w-full px-3 py-2 rounded-xl bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-400 font-mono text-xs"
                 >
-                  <option value="feature">Feature Development</option>
-                  <option value="basics">Git Basics</option>
-                  <option value="hotfix">Hotfix & Patch</option>
+                  <option value="enterprise">Big Tech & Enterprise</option>
+                  <option value="startup">Startup & Agile Teams</option>
+                  <option value="casual">Casual & Solo Devs</option>
                   <option value="opensource">Open Source PR</option>
-                  <option value="release">Release</option>
+                  <option value="hotfix">Emergency Hotfix</option>
                   <option value="monorepo">Monorepo</option>
+                  <option value="basics">Git Basics</option>
                 </select>
               </div>
 

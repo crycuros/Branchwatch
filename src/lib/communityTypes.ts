@@ -4,13 +4,16 @@ export type WorkflowVisibility = 'public' | 'unlisted' | 'private';
 
 export type WorkflowCategory =
   | 'all'
+  | 'enterprise'
+  | 'startup'
+  | 'casual'
+  | 'opensource'
+  | 'hotfix'
+  | 'monorepo'
   | 'basics'
   | 'feature'
-  | 'hotfix'
-  | 'opensource'
   | 'release'
-  | 'cicd'
-  | 'monorepo';
+  | 'cicd';
 
 export interface WorkflowAuthor {
   login: string;
